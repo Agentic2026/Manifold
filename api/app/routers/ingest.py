@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db_session
+from app.core.config import settings
 from app.schemas.cadvisor import CadvisorBatchPayloadSchema
 from app.services.ingestion import process_cadvisor_batch
 
@@ -12,7 +13,7 @@ security = HTTPBearer()
 
 def verify_cadvisor_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     # Validate the token against configured secret
-    expected_token = os.getenv("CADVISOR_METRICS_API_TOKEN", "my-secret-token")
+    expected_token = settings.cadvisor_metrics_api_token
     if credentials.credentials != expected_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return credentials.credentials
