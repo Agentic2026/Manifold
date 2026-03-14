@@ -31,7 +31,7 @@ export function Login() {
     setPasskeyLoading(true);
     try {
       await loginPasskey();
-      navigate("/dashboard");
+      navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Passkey login failed");
     } finally {
@@ -48,7 +48,7 @@ export function Login() {
     setPasswordLoading(true);
     try {
       await loginPassword(trimmedEmail, password);
-      navigate("/dashboard");
+      navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
     } finally {
