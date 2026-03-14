@@ -6,7 +6,6 @@ import { Register } from "./Register";
 vi.mock("../auth", () => ({
   useAuth: () => ({
     registerPasskey: vi.fn(),
-    registerPassword: vi.fn(),
   }),
 }));
 
@@ -29,7 +28,7 @@ vi.mock("react-router", () => ({
 }));
 
 describe("Register page", () => {
-  it("renders Display Name label instead of Username", () => {
+  it("renders Display Name label", () => {
     render(<Register />);
     expect(screen.getByLabelText("Display Name")).toBeInTheDocument();
     expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
@@ -40,13 +39,6 @@ describe("Register page", () => {
     const input = screen.getByTestId("register-display-name");
     expect(input).toBeInTheDocument();
     expect(input).toHaveAttribute("type", "text");
-  });
-
-  it("has email input for password registration", () => {
-    render(<Register />);
-    const input = screen.getByTestId("register-email-input");
-    expect(input).toBeInTheDocument();
-    expect(input).toHaveAttribute("type", "email");
   });
 
   it("enforces maxLength on display name input", () => {
@@ -61,18 +53,26 @@ describe("Register page", () => {
     expect(input).toHaveAttribute("autoComplete", "name");
   });
 
-  it("uses the shared PasswordField component for the password input", () => {
-    render(<Register />);
-    const input = screen.getByTestId("register-password-input");
-    expect(input).toHaveAttribute("type", "password");
-    expect(
-      screen.getByRole("button", { name: "Show password" }),
-    ).toBeInTheDocument();
-  });
-
-  it("has distinct passkey and password submit elements", () => {
+  it("renders a passkey register button", () => {
     render(<Register />);
     expect(screen.getByTestId("register-submit")).toBeInTheDocument();
-    expect(screen.getByTestId("register-password-btn")).toBeInTheDocument();
+    expect(screen.getByText("Register with Passkey")).toBeInTheDocument();
+  });
+
+  it("does not render email or password inputs", () => {
+    render(<Register />);
+    expect(
+      screen.queryByTestId("register-email-input"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("register-password-input"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not have a password submit button", () => {
+    render(<Register />);
+    expect(
+      screen.queryByTestId("register-password-btn"),
+    ).not.toBeInTheDocument();
   });
 });

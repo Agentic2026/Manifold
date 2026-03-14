@@ -6,7 +6,6 @@ import { Login } from "./Login";
 vi.mock("../auth", () => ({
   useAuth: () => ({
     loginPasskey: vi.fn(),
-    loginPassword: vi.fn(),
   }),
 }));
 
@@ -29,49 +28,30 @@ vi.mock("react-router", () => ({
 }));
 
 describe("Login page", () => {
-  it("renders Email label instead of Username", () => {
-    render(<Login />);
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
-  });
-
-  it("has email input with correct type and testid", () => {
-    render(<Login />);
-    const input = screen.getByTestId("login-email-input");
-    expect(input).toBeInTheDocument();
-    expect(input).toHaveAttribute("type", "email");
-  });
-
-  it("uses email autocomplete for the email field", () => {
-    render(<Login />);
-    const input = screen.getByTestId("login-email-input");
-    expect(input).toHaveAttribute("autoComplete", "email");
-  });
-
-  it("does not have a username input", () => {
-    render(<Login />);
-    expect(screen.queryByTestId("login-username-input")).not.toBeInTheDocument();
-  });
-
-  it("uses the shared PasswordField component for the password input", () => {
-    render(<Login />);
-    const input = screen.getByTestId("login-password-input");
-    expect(input).toHaveAttribute("type", "password");
-    // The PasswordField renders a visibility toggle button
-    expect(
-      screen.getByRole("button", { name: "Show password" }),
-    ).toBeInTheDocument();
-  });
-
-  it("has distinct passkey and password submit elements", () => {
+  it("renders a passkey sign-in button", () => {
     render(<Login />);
     expect(screen.getByTestId("login-submit")).toBeInTheDocument();
-    expect(screen.getByTestId("login-password-btn")).toBeInTheDocument();
+    expect(screen.getByText("Sign in with Passkey")).toBeInTheDocument();
   });
 
-  it("links to the forgot-password page", () => {
+  it("does not render email or password inputs", () => {
     render(<Login />);
-    const link = screen.getByText("Forgot password?");
-    expect(link).toHaveAttribute("href", "/forgot-password");
+    expect(screen.queryByTestId("login-email-input")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("login-password-input"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not have a password submit button", () => {
+    render(<Login />);
+    expect(
+      screen.queryByTestId("login-password-btn"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("links to the register page", () => {
+    render(<Login />);
+    const link = screen.getByText("Sign up");
+    expect(link).toHaveAttribute("href", "/register");
   });
 });

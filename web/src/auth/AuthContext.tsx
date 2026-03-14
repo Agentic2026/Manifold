@@ -30,12 +30,6 @@ import type { components } from "../api/openapi";
 /** Backend auth response shape (passkey finish / add finish). */
 type PasskeyFinishResponse = components["schemas"]["PasskeyFinishResponse"];
 
-/** Backend auth response shape (password register / login / reset). */
-type DeviceBindingResponse = components["schemas"]["DeviceBindingResponse"];
-
-/** Union of all auth response shapes the frontend needs to handle. */
-type AuthResponse = PasskeyFinishResponse | DeviceBindingResponse;
-
 /** Passkey register start response. */
 type PasskeyRegisterStartResponse =
   components["schemas"]["PasskeyRegisterStartResponse"];
@@ -66,13 +60,7 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   loginPasskey: () => Promise<void>;
-  loginPassword: (email: string, password: string) => Promise<void>;
   registerPasskey: (displayName: string) => Promise<void>;
-  registerPassword: (
-    displayName: string,
-    email: string,
-    password: string,
-  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -88,22 +76,8 @@ export function useAuth(): AuthContextType {
 // Provider
 // ---------------------------------------------------------------------------
 
-/** Standard error envelope returned by auth routes on failure. */
-interface ErrorDetail {
-  detail?: string;
-}
-
-/** Extract a human-readable message from a failed auth response. */
-function extractError(data: unknown, fallback: string): string {
-  if (data && typeof data === "object" && "detail" in data) {
-    const d = (data as ErrorDetail).detail;
-    if (typeof d === "string") return d;
-  }
-  return fallback;
-}
-
-/** Extract display_name from either auth response type. */
-function extractDisplayName(data: AuthResponse): string | null {
+/** Extract display_name from a passkey auth response. */
+function extractDisplayName(data: PasskeyFinishResponse): string | null {
   return data.display_name ?? null;
 }
 
@@ -228,30 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const loginPassword = useCallback(
-    async (email: string, password: string) => {
-      const keyMaterial = await ensureDeviceKeyMaterial();
-      const res = await publicFetch<DeviceBindingResponse>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email,
-          password,
-          device_public_key_jwk: keyMaterial.publicJwk,
-          device_label: navigator.userAgent.slice(0, 64),
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(extractError(res.data, "Login failed"));
-      }
-      updateState(
-        res.data.user_id,
-        res.data.device_id,
-        res.data.role,
-        extractDisplayName(res.data),
-      );
-    },
-    [],
-  );
+
 
   const registerPasskey = useCallback(async (displayName: string) => {
     const keyMaterial = await ensureDeviceKeyMaterial();
@@ -296,31 +247,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const registerPassword = useCallback(
-    async (displayName: string, email: string, password: string) => {
-      const keyMaterial = await ensureDeviceKeyMaterial();
-      const res = await publicFetch<DeviceBindingResponse>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          display_name: displayName,
-          email,
-          password,
-          device_public_key_jwk: keyMaterial.publicJwk,
-          device_label: navigator.userAgent.slice(0, 64),
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(extractError(res.data, "Registration failed"));
-      }
-      updateState(
-        res.data.user_id,
-        res.data.device_id,
-        res.data.role,
-        extractDisplayName(res.data),
-      );
-    },
-    [],
-  );
 
   const logout = useCallback(async () => {
     clearCachedToken();
@@ -342,9 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         loginPasskey,
-        loginPassword,
         registerPasskey,
-        registerPassword,
         logout,
       }}
     >
