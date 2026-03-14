@@ -2,6 +2,18 @@
 
 **Manifold** is a futuristic DAG UI security monitoring and analysis platform for *vibe-coded* containerized systems — software rapidly assembled with AI tools that may harbor hidden security risks. It maps service dependencies from Docker Compose files into an interactive topology graph and uses an LLM security agent to reason about anomalies detected through live container metrics.
 
+## Project Status
+
+Manifold is currently in a **prototype-to-production transition phase**.
+
+- Core backend and frontend functionality are implemented and testable locally.
+- Backend and frontend unit tests currently pass.
+- A frontend lint issue is currently outstanding (`web/src/components/SecurityGauge.tsx`).
+
+For a detailed assessment and phased production plan, see:
+
+- [`docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md`](docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md)
+
 ## Architecture Overview
 
 Manifold is composed of three core layers:

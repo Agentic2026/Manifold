@@ -7,6 +7,11 @@ Manifold is a continuous cybersecurity monitoring platform.
 - **Backend (`/api`)**: Python, FastAPI, SQLAlchemy 2.0 (PostgreSQL via asyncpg), LangGraph.
 - **Frontend (`/web`)**: TypeScript, React (Vite).
 
+## Current Project Maturity
+- The repository is in a **prototype-to-production hardening** stage.
+- Before proposing major implementation work, review `docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md`.
+- Prefer incremental, test-backed changes aligned with that plan.
+
 ## Toolchain & Dependencies
 
 ### Backend
@@ -25,3 +30,8 @@ Manifold is a continuous cybersecurity monitoring platform.
 - **Telemetry Ingestion**: The backend ingests batched cAdvisor telemetry payloads via `POST /cadvisor/batch`. The router requires a `CADVISOR_METRICS_API_TOKEN` bearer token defined in the backend settings.
 - **Database Modularity**: `SQLAlchemy` queries heavily lean into PostgreSQL-specific `JSONB` fields (`cpu_stats`, `memory_stats`) and `TIMESTAMP WITH TIME ZONE`. Use bulk inserts (`insert().values().on_conflict_...`) instead of the traditional ORM session approach for high-throughput metrics.
 - **LangGraph Integration**: Time-series aggregations should be performed in PostgreSQL using CTEs or Window Functions (see `api/app/agents/tools/telemetry.py`) instead of passing raw row data to the LLM.
+
+## Documentation & Planning Expectations
+- Keep README status information and production-readiness docs in sync with code reality.
+- If you discover a notable readiness gap (security, reliability, observability, delivery), record it in `docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md`.
+- Prefer adding concrete checklists and phased plans over vague TODO notes.
