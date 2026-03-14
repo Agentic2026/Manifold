@@ -284,26 +284,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Current session
-         * @description Return information about the currently authenticated session.
-         */
-        get: operations["get_session_auth_session_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/demo/echo": {
         parameters: {
             query?: never;
@@ -404,178 +384,10 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List jobs
-         * @description List recent jobs for the current user.
-         */
-        get: operations["list_jobs_jobs_get"];
-        put?: never;
-        /**
-         * Enqueue a job
-         * @description Create a new background job.
-         */
-        post: operations["create_job_jobs_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/jobs/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get job
-         * @description Get details of a specific job.
-         */
-        get: operations["get_job_jobs__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/llm/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Chat completion
-         * @description Non-streaming chat completion. Requires OpenAI API key.
-         */
-        post: operations["chat_llm_chat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/llm/chat/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Streaming chat completion
-         * @description Stream LLM tokens via SSE. Requires OpenAI API key.
-         */
-        post: operations["chat_stream_llm_chat_stream_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/uploads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List uploads
-         * @description List uploads for the current user.
-         */
-        get: operations["list_uploads_uploads_get"];
-        put?: never;
-        /**
-         * Upload a file
-         * @description Upload a file (multipart/form-data).
-         */
-        post: operations["upload_file_uploads_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/uploads/{upload_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get upload metadata */
-        get: operations["get_upload_uploads__upload_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/uploads/{upload_id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download a file
-         * @description Stream the file back to the owner.
-         */
-        get: operations["download_upload_uploads__upload_id__download_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** Body_upload_file_uploads_post */
-        Body_upload_file_uploads_post: {
-            /** File */
-            file: string;
-        };
-        /** ChatRequest */
-        ChatRequest: {
-            /**
-             * Model
-             * @description Optional model override.
-             */
-            model?: string | null;
-            /**
-             * System
-             * @description Optional system prompt.
-             */
-            system?: string | null;
-            /**
-             * User
-             * @description User message.
-             */
-            user: string;
-        };
         /** DeviceBindingResponse */
         DeviceBindingResponse: {
             /**
@@ -583,11 +395,6 @@ export interface components {
              * @description Device ID that starts with the d prefix, empty when no device key is bound.
              */
             device_id: string;
-            /**
-             * Display Name
-             * @description Human-facing display name for the user.
-             */
-            display_name?: string | null;
             /**
              * Role
              * @description Server-side role for the user.
@@ -619,27 +426,6 @@ export interface components {
              * @description Reversed message.
              */
             reversed: string;
-        };
-        /** EnqueueJobRequest */
-        EnqueueJobRequest: {
-            /**
-             * Kind
-             * @description Registered job kind.
-             */
-            kind: string;
-            /**
-             * Payload
-             * @description Job payload.
-             */
-            payload?: {
-                [key: string]: unknown;
-            };
-            /**
-             * Queue
-             * @description Target queue name.
-             * @default default
-             */
-            queue: string;
         };
         /**
          * ErrorResponse
@@ -673,32 +459,6 @@ export interface components {
              * Status
              * @description Health check status.
              */
-            status: string;
-        };
-        /** JobResponse */
-        JobResponse: {
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Error */
-            error?: string | null;
-            /** Finished At */
-            finished_at?: string | null;
-            /** Id */
-            id: string;
-            /** Kind */
-            kind: string;
-            /** Progress */
-            progress: number;
-            /** Queue */
-            queue: string;
-            /** Result Json */
-            result_json?: string | null;
-            /** Started At */
-            started_at?: string | null;
-            /** Status */
             status: string;
         };
         /** LoginRequest */
@@ -906,14 +666,6 @@ export interface components {
              */
             flow_id: string;
         };
-        /** PasskeyRegisterStartRequest */
-        PasskeyRegisterStartRequest: {
-            /**
-             * Display Name
-             * @description Human-facing display name for the new account.
-             */
-            display_name: string;
-        };
         /** PasskeyRegisterStartResponse */
         PasskeyRegisterStartResponse: {
             /**
@@ -1015,11 +767,6 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /**
-             * Display Name
-             * @description Human-facing display name for the account.
-             */
-            display_name: string;
-            /**
              * Email
              * Format: email
              * @description Account email for password-based signup.
@@ -1038,62 +785,6 @@ export interface components {
              * @description Welcome message.
              */
             message: string;
-        };
-        /**
-         * SessionResponse
-         * @description Current authenticated session info.
-         */
-        SessionResponse: {
-            /**
-             * Device Id
-             * @description Device ID from the verified JWT.
-             */
-            device_id: string;
-            /**
-             * Display Name
-             * @description Display name.
-             */
-            display_name?: string | null;
-            /**
-             * Email
-             * @description User email if set.
-             */
-            email?: string | null;
-            /**
-             * Role
-             * @description Server-side role.
-             */
-            role: string;
-            /**
-             * Scopes
-             * @description User scopes as a list.
-             */
-            scopes: string[];
-            /**
-             * User Id
-             * @description User ID.
-             */
-            user_id: string;
-        };
-        /** UploadResponse */
-        UploadResponse: {
-            /** Byte Size */
-            byte_size: number;
-            /** Content Type */
-            content_type: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Extraction Job Id */
-            extraction_job_id?: string | null;
-            /** Id */
-            id: string;
-            /** Original Filename */
-            original_filename: string;
-            /** Sha256 */
-            sha256: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1370,11 +1061,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasskeyRegisterStartRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1392,15 +1079,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1679,26 +1357,6 @@ export interface operations {
             };
         };
     };
-    get_session_auth_session_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionResponse"];
-                };
-            };
-        };
-    };
     demo_echo_demo_echo_post: {
         parameters: {
             query?: never;
@@ -1823,272 +1481,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthzResponse"];
-                };
-            };
-        };
-    };
-    list_jobs_jobs_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobResponse"][];
-                };
-            };
-        };
-    };
-    create_job_jobs_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EnqueueJobRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_job_jobs__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    chat_llm_chat_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    chat_stream_llm_chat_stream_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                    "text/event-stream": string;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_uploads_uploads_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UploadResponse"][];
-                };
-            };
-        };
-    };
-    upload_file_uploads_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_file_uploads_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UploadResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_upload_uploads__upload_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                upload_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UploadResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    download_upload_uploads__upload_id__download_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                upload_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
