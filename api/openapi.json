@@ -1,76 +1,12 @@
 {
   "components": {
     "schemas": {
-      "Body_upload_file_uploads_post": {
-        "properties": {
-          "file": {
-            "contentMediaType": "application/octet-stream",
-            "title": "File",
-            "type": "string"
-          }
-        },
-        "required": [
-          "file"
-        ],
-        "title": "Body_upload_file_uploads_post",
-        "type": "object"
-      },
-      "ChatRequest": {
-        "properties": {
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Optional model override.",
-            "title": "Model"
-          },
-          "system": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Optional system prompt.",
-            "title": "System"
-          },
-          "user": {
-            "description": "User message.",
-            "title": "User",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user"
-        ],
-        "title": "ChatRequest",
-        "type": "object"
-      },
       "DeviceBindingResponse": {
         "properties": {
           "device_id": {
             "description": "Device ID that starts with the d prefix, empty when no device key is bound.",
             "title": "Device Id",
             "type": "string"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Human-facing display name for the user.",
-            "title": "Display Name"
           },
           "role": {
             "description": "Server-side role for the user.",
@@ -123,32 +59,6 @@
           "reversed"
         ],
         "title": "EchoResponse",
-        "type": "object"
-      },
-      "EnqueueJobRequest": {
-        "properties": {
-          "kind": {
-            "description": "Registered job kind.",
-            "title": "Kind",
-            "type": "string"
-          },
-          "payload": {
-            "additionalProperties": true,
-            "description": "Job payload.",
-            "title": "Payload",
-            "type": "object"
-          },
-          "queue": {
-            "default": "default",
-            "description": "Target queue name.",
-            "title": "Queue",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind"
-        ],
-        "title": "EnqueueJobRequest",
         "type": "object"
       },
       "ErrorResponse": {
@@ -215,91 +125,6 @@
           "status"
         ],
         "title": "HealthzResponse",
-        "type": "object"
-      },
-      "JobResponse": {
-        "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "finished_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finished At"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
-          "progress": {
-            "title": "Progress",
-            "type": "integer"
-          },
-          "queue": {
-            "title": "Queue",
-            "type": "string"
-          },
-          "result_json": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Result Json"
-          },
-          "started_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Started At"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "queue",
-          "status",
-          "progress",
-          "created_at"
-        ],
-        "title": "JobResponse",
         "type": "object"
       },
       "LoginRequest": {
@@ -656,21 +481,6 @@
         "title": "PasskeyRegisterFinishRequest",
         "type": "object"
       },
-      "PasskeyRegisterStartRequest": {
-        "properties": {
-          "display_name": {
-            "description": "Human-facing display name for the new account.",
-            "maxLength": 200,
-            "title": "Display Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "display_name"
-        ],
-        "title": "PasskeyRegisterStartRequest",
-        "type": "object"
-      },
       "PasskeyRegisterStartResponse": {
         "properties": {
           "flow_id": {
@@ -852,12 +662,6 @@
             "description": "Optional device public key in JWK format to bind a device identity.",
             "title": "Device Public Key Jwk"
           },
-          "display_name": {
-            "description": "Human-facing display name for the account.",
-            "maxLength": 200,
-            "title": "Display Name",
-            "type": "string"
-          },
           "email": {
             "description": "Account email for password-based signup.",
             "format": "email",
@@ -872,8 +676,7 @@
         },
         "required": [
           "email",
-          "password",
-          "display_name"
+          "password"
         ],
         "title": "RegisterRequest",
         "type": "object"
@@ -890,116 +693,6 @@
           "message"
         ],
         "title": "RootResponse",
-        "type": "object"
-      },
-      "SessionResponse": {
-        "description": "Current authenticated session info.",
-        "properties": {
-          "device_id": {
-            "description": "Device ID from the verified JWT.",
-            "title": "Device Id",
-            "type": "string"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Display name.",
-            "title": "Display Name"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User email if set.",
-            "title": "Email"
-          },
-          "role": {
-            "description": "Server-side role.",
-            "title": "Role",
-            "type": "string"
-          },
-          "scopes": {
-            "description": "User scopes as a list.",
-            "items": {
-              "type": "string"
-            },
-            "title": "Scopes",
-            "type": "array"
-          },
-          "user_id": {
-            "description": "User ID.",
-            "title": "User Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id",
-          "device_id",
-          "role",
-          "scopes"
-        ],
-        "title": "SessionResponse",
-        "type": "object"
-      },
-      "UploadResponse": {
-        "properties": {
-          "byte_size": {
-            "title": "Byte Size",
-            "type": "integer"
-          },
-          "content_type": {
-            "title": "Content Type",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "extraction_job_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extraction Job Id"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "original_filename": {
-            "title": "Original Filename",
-            "type": "string"
-          },
-          "sha256": {
-            "title": "Sha256",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "original_filename",
-          "content_type",
-          "byte_size",
-          "sha256",
-          "created_at"
-        ],
-        "title": "UploadResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -1364,16 +1057,6 @@
       "post": {
         "description": "Begin a passkey registration ceremony. Creates a new user and a single-use challenge flow, then returns WebAuthn registration options.",
         "operationId": "register_start_auth_passkey_register_start_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasskeyRegisterStartRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {
@@ -1394,16 +1077,6 @@
               }
             },
             "description": "Invalid request or WebAuthn configuration error."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "summary": "Start passkey registration",
@@ -1770,33 +1443,6 @@
         ]
       }
     },
-    "/auth/session": {
-      "get": {
-        "description": "Return information about the currently authenticated session.",
-        "operationId": "get_session_auth_session_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Current session",
-        "tags": [
-          "auth"
-        ]
-      }
-    },
     "/demo/echo": {
       "post": {
         "description": "Echo back the message along with its reverse.",
@@ -1932,394 +1578,6 @@
           }
         },
         "summary": "Health check"
-      }
-    },
-    "/jobs": {
-      "get": {
-        "description": "List recent jobs for the current user.",
-        "operationId": "list_jobs_jobs_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/JobResponse"
-                  },
-                  "title": "Response List Jobs Jobs Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "List jobs",
-        "tags": [
-          "jobs"
-        ]
-      },
-      "post": {
-        "description": "Create a new background job.",
-        "operationId": "create_job_jobs_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EnqueueJobRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Enqueue a job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/jobs/{job_id}": {
-      "get": {
-        "description": "Get details of a specific job.",
-        "operationId": "get_job_jobs__job_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Get job",
-        "tags": [
-          "jobs"
-        ]
-      }
-    },
-    "/llm/chat": {
-      "post": {
-        "description": "Non-streaming chat completion. Requires OpenAI API key.",
-        "operationId": "chat_llm_chat_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Chat completion",
-        "tags": [
-          "llm"
-        ]
-      }
-    },
-    "/llm/chat/stream": {
-      "post": {
-        "description": "Stream LLM tokens via SSE. Requires OpenAI API key.",
-        "operationId": "chat_stream_llm_chat_stream_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              },
-              "text/event-stream": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Streaming chat completion",
-        "tags": [
-          "llm"
-        ]
-      }
-    },
-    "/uploads": {
-      "get": {
-        "description": "List uploads for the current user.",
-        "operationId": "list_uploads_uploads_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UploadResponse"
-                  },
-                  "title": "Response List Uploads Uploads Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "List uploads",
-        "tags": [
-          "uploads"
-        ]
-      },
-      "post": {
-        "description": "Upload a file (multipart/form-data).",
-        "operationId": "upload_file_uploads_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_file_uploads_post"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UploadResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Upload a file",
-        "tags": [
-          "uploads"
-        ]
-      }
-    },
-    "/uploads/{upload_id}": {
-      "get": {
-        "operationId": "get_upload_uploads__upload_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "upload_id",
-            "required": true,
-            "schema": {
-              "title": "Upload Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UploadResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Get upload metadata",
-        "tags": [
-          "uploads"
-        ]
-      }
-    },
-    "/uploads/{upload_id}/download": {
-      "get": {
-        "description": "Stream the file back to the owner.",
-        "operationId": "download_upload_uploads__upload_id__download_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "upload_id",
-            "required": true,
-            "schema": {
-              "title": "Upload Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "DeviceJWT": []
-          }
-        ],
-        "summary": "Download a file",
-        "tags": [
-          "uploads"
-        ]
       }
     }
   }

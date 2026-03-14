@@ -1,6 +1,7 @@
 .venv/
 node_modules/
 dist/
+__pycache__/
 
 # Claude Code working directory (worktrees, settings)
 .claude/
