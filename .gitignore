@@ -1,3 +1,6 @@
 .venv/
 node_modules/
 
+# Claude Code working directory (worktrees, settings)
+.claude/
+
