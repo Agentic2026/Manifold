@@ -25,7 +25,7 @@ async function registerUser(
   await page.goto("/register");
   await page.getByTestId("register-display-name").fill(name);
   await page.getByTestId("register-submit").click();
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/.*localhost:5173\/?$/, { timeout: 15_000 });
 }
 
 test.describe("Security: stable device identity", () => {
@@ -82,7 +82,7 @@ test.describe("Security: stable device identity", () => {
     // Login again
     await page.goto("/login");
     await page.getByTestId("login-submit").click();
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/.*localhost:5173\/?$/, { timeout: 15_000 });
 
     // Capture device_id after re-login
     const deviceId2 = await page.evaluate(async () => {
