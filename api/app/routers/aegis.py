@@ -1,14 +1,16 @@
 from datetime import UTC, datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+import yaml
+from fastapi import APIRouter, Depends, Body
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 
 from app.core.database import get_db_session
 from app.models.topology import TopologyNode as DBNode, TopologyEdge as DBEdge, Vulnerability as DBVuln, LLMInsight as DBInsight, RBACPolicy as DBRBAC
+from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
 
 router = APIRouter(prefix="/api", tags=["aegis"])
@@ -22,8 +24,9 @@ router = APIRouter(prefix="/api", tags=["aegis"])
 class NodeTelemetry(BaseModel):
     ingressMbps: float
     egressMbps: float
-    latencyMs: float
-    errorRate: float
+    latencyMs: Optional[float] = None   # Not derivable from cAdvisor today
+    errorRate: Optional[float] = None    # Not derivable from cAdvisor today
+    lastSeen: Optional[str] = None
 
 
 class NodeAnalysis(BaseModel):
@@ -189,6 +192,233 @@ MOCK_EDGES: List[TopologyEdge] = [
     TopologyEdge(id="e-agent-vector", source="llm-agent", target="db-vector", kind="api", label="vector_read_role", animated=True),
 ]
 
+# ────────────────────────────────────────────────────────────
+# Topology helpers: import, telemetry aggregation, status
+# ────────────────────────────────────────────────────────────
+
+# Staleness threshold – if the most recent snapshot for a node is older
+# than this many seconds the node is considered "stale".
+_STALE_SECONDS = 120
+# Egress warning threshold in Mbps
+_EGRESS_WARNING_MBPS = 50.0
+
+
+class ComposeImportRequest(BaseModel):
+    """Accepts raw Docker Compose YAML for topology import."""
+    yaml_content: str
+
+
+def _parse_compose_to_topology(compose_text: str) -> tuple[list[dict], list[dict]]:
+    """Parse a Docker Compose YAML string into topology node/edge dicts.
+
+    Returns (nodes, edges) where each element is a dict suitable for
+    constructing ``TopologyNode`` / ``TopologyEdge`` ORM objects.
+    """
+    doc = yaml.safe_load(compose_text)
+    services = doc.get("services") or {}
+    svc_names = list(services.keys())
+
+    # Deterministic grid layout – 3 columns
+    COL_WIDTH, ROW_HEIGHT = 260, 160
+    COLS = 3
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen_edges: set[str] = set()
+
+    # Service-type heuristics
+    def _guess_type(name: str, svc: dict) -> str:
+        image = (svc.get("image") or "").lower()
+        name_l = name.lower()
+        if any(k in name_l for k in ("db", "postgres", "mysql", "redis", "mongo")):
+            return "database"
+        if any(k in image for k in ("postgres", "mysql", "redis", "mongo")):
+            return "database"
+        if any(k in name_l for k in ("web", "frontend", "ui", "nginx")):
+            return "frontend"
+        if any(k in name_l for k in ("gateway", "lb", "proxy", "traefik")):
+            return "gateway"
+        if any(k in name_l for k in ("agent", "llm", "ai")):
+            return "agent"
+        if any(k in name_l for k in ("api", "backend", "server")):
+            return "api"
+        return "service"
+
+    for idx, svc_name in enumerate(svc_names):
+        svc = services[svc_name]
+        col = idx % COLS
+        row = idx // COLS
+
+        ports_desc = ""
+        ports = svc.get("ports") or []
+        if ports:
+            ports_desc = f"  Ports: {', '.join(str(p) for p in ports)}"
+
+        nodes.append({
+            "id": svc_name,
+            "label": svc_name,
+            "service_id": svc_name,
+            "status": "healthy",
+            "type": _guess_type(svc_name, svc),
+            "position": {"x": 60 + col * COL_WIDTH, "y": 60 + row * ROW_HEIGHT},
+            "description": f"Imported from Docker Compose.{ports_desc}",
+        })
+
+        # Edges from depends_on
+        depends = svc.get("depends_on") or []
+        if isinstance(depends, dict):
+            depends = list(depends.keys())
+        for dep in depends:
+            edge_id = f"e-{svc_name}-{dep}"
+            if edge_id not in seen_edges and dep in services:
+                edges.append({
+                    "id": edge_id,
+                    "source_id": svc_name,
+                    "target_id": dep,
+                    "kind": "network",
+                    "label": f"depends_on",
+                    "animated": False,
+                })
+                seen_edges.add(edge_id)
+
+    # Edges from shared networks
+    network_members: dict[str, list[str]] = {}
+    for svc_name, svc in services.items():
+        nets = svc.get("networks")
+        if isinstance(nets, list):
+            for n in nets:
+                network_members.setdefault(n, []).append(svc_name)
+        elif isinstance(nets, dict):
+            for n in nets:
+                network_members.setdefault(n, []).append(svc_name)
+
+    for net_name, members in network_members.items():
+        for i, a in enumerate(members):
+            for b in members[i + 1:]:
+                edge_id = f"e-net-{net_name}-{a}-{b}"
+                if edge_id not in seen_edges:
+                    edges.append({
+                        "id": edge_id,
+                        "source_id": a,
+                        "target_id": b,
+                        "kind": "network",
+                        "label": f"network:{net_name}",
+                        "animated": False,
+                    })
+                    seen_edges.add(edge_id)
+
+    return nodes, edges
+
+
+def _bytes_to_mbps(byte_count: float, interval_seconds: float = 15.0) -> float:
+    """Convert a byte count over an interval to Mbps (megabits per second)."""
+    if interval_seconds <= 0:
+        return 0.0
+    return round((byte_count * 8) / (interval_seconds * 1_000_000), 3)
+
+
+async def _aggregate_node_telemetry(
+    node_id: str,
+    db: AsyncSession,
+    lookback_seconds: int = 60,
+) -> Optional[NodeTelemetry]:
+    """Aggregate recent network telemetry for containers mapped to *node_id*.
+
+    Returns ``None`` when no snapshots exist for the node in the lookback
+    window (or no containers are mapped at all).
+    """
+    cutoff = datetime.now(UTC) - timedelta(seconds=lookback_seconds)
+
+    # Find containers mapped to this topology node
+    containers_q = await db.execute(
+        select(Container.id).where(Container.topology_node_id == node_id)
+    )
+    container_ids = [r[0] for r in containers_q.all()]
+    if not container_ids:
+        return None
+
+    # Latest snapshot per container within the lookback window
+    snapshots_q = await db.execute(
+        select(ContainerMetricSnapshot)
+        .where(
+            ContainerMetricSnapshot.container_id.in_(container_ids),
+            ContainerMetricSnapshot.timestamp >= cutoff,
+        )
+        .order_by(ContainerMetricSnapshot.timestamp.desc())
+    )
+    snapshots = snapshots_q.scalars().all()
+    if not snapshots:
+        return None
+
+    total_rx_bytes = 0.0
+    total_tx_bytes = 0.0
+    latest_ts: Optional[datetime] = None
+
+    for snap in snapshots:
+        net = snap.network_stats
+        if net and isinstance(net, dict):
+            # cAdvisor network stats may be a dict of interfaces or a flat dict
+            if "interfaces" in net:
+                for iface in net["interfaces"]:
+                    total_rx_bytes += iface.get("rx_bytes", 0)
+                    total_tx_bytes += iface.get("tx_bytes", 0)
+            else:
+                total_rx_bytes += net.get("rx_bytes", 0)
+                total_tx_bytes += net.get("tx_bytes", 0)
+
+        if latest_ts is None or snap.timestamp > latest_ts:
+            latest_ts = snap.timestamp
+
+    ingress = _bytes_to_mbps(total_rx_bytes / max(len(snapshots), 1))
+    egress = _bytes_to_mbps(total_tx_bytes / max(len(snapshots), 1))
+
+    return NodeTelemetry(
+        ingressMbps=ingress,
+        egressMbps=egress,
+        latencyMs=None,    # Not derivable from cAdvisor
+        errorRate=None,     # Not derivable from cAdvisor
+        lastSeen=latest_ts.isoformat() if latest_ts else None,
+    )
+
+
+def _compute_node_status(
+    current_status: str,
+    telemetry: Optional[NodeTelemetry],
+    last_snapshot_ts: Optional[datetime] = None,
+) -> str:
+    """Deterministic status engine.
+
+    Rules (applied in priority order):
+    1. If no telemetry data exists at all → keep current DB status (may be
+       freshly imported and no containers matched yet).
+    2. If the most recent snapshot is older than ``_STALE_SECONDS`` → ``warning``
+       (stale data).
+    3. If egress > ``_EGRESS_WARNING_MBPS`` → ``warning``.
+    4. Otherwise → ``healthy``.
+
+    This engine never promotes a node to *compromised* – that requires
+    stronger evidence (e.g. LLM-driven analysis).
+    """
+    if telemetry is None:
+        return current_status  # no mapped containers or no data yet
+
+    # Staleness check
+    if telemetry.lastSeen:
+        try:
+            last_seen_dt = datetime.fromisoformat(telemetry.lastSeen)
+            age = (datetime.now(UTC) - last_seen_dt).total_seconds()
+            if age > _STALE_SECONDS:
+                return "warning"
+        except Exception:
+            pass
+
+    # Egress threshold
+    if telemetry.egressMbps > _EGRESS_WARNING_MBPS:
+        return "warning"
+
+    return "healthy"
+
+
 async def _compute_security_score(db: AsyncSession) -> SecurityScore:
     score = 100
     breakdown = []
@@ -261,6 +491,42 @@ async def seed_topology(db: AsyncSession = Depends(get_db_session)) -> dict:
     return {"status": "seeded"}
 
 
+@router.post("/topology/import")
+async def import_topology(
+    body: ComposeImportRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Import topology from a Docker Compose YAML document.
+
+    Parses services, depends_on, and shared networks to create topology
+    nodes and edges.  Existing nodes/edges are deleted first so each import
+    is idempotent.
+
+    Example payload::
+
+        {
+            "yaml_content": "<raw docker-compose YAML>"
+        }
+    """
+    node_dicts, edge_dicts = _parse_compose_to_topology(body.yaml_content)
+
+    # Clear existing topology (idempotent import)
+    await db.execute(delete(DBEdge))
+    await db.execute(delete(DBNode))
+
+    for nd in node_dicts:
+        db.add(DBNode(**nd))
+    for ed in edge_dicts:
+        db.add(DBEdge(**ed))
+    await db.commit()
+
+    return {
+        "status": "imported",
+        "nodes": len(node_dicts),
+        "edges": len(edge_dicts),
+    }
+
+
 @router.get("/topology", response_model=TopologyData)
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
     nodes_q = await db.execute(select(DBNode))
@@ -268,9 +534,17 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
     
     nodes = []
     for n in nodes_q.scalars().all():
+        # Aggregate real telemetry for this node
+        telem = await _aggregate_node_telemetry(n.id, db)
+
+        # Deterministic status engine
+        status = _compute_node_status(n.status, telem)
+
         nodes.append(TopologyNode(
-            id=n.id, label=n.label, serviceId=n.service_id, status=n.status, type=n.type,
-            position=n.position, description=n.description, telemetry=None, analysis=None
+            id=n.id, label=n.label, serviceId=n.service_id, status=status, type=n.type,
+            position=n.position, description=n.description,
+            telemetry=telem,
+            analysis=n.analysis if isinstance(n.analysis, dict) else None,
         ))
         
     edges = []
