@@ -1090,7 +1090,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=44.0" },
-    { name = "greenlet", specifier = ">=3.0" },
+    { name = "greenlet", specifier = ">=3.3.2" },
     { name = "h4ckath0n", specifier = ">=0.1.9" },
 ]
 
