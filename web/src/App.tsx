@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./pages/Login";
@@ -10,6 +10,10 @@ import { LLMInsights } from "./pages/LLMInsights";
 import { Vulnerabilities } from "./pages/Vulnerabilities";
 import { RBACPolicies } from "./pages/RBACPolicies";
 import { AppSettings } from "./pages/AppSettings";
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 
 export function App() {
   return (
@@ -34,6 +38,9 @@ export function App() {
         <Route path="/rbac"            element={<RBACPolicies />} />
         <Route path="/settings"        element={<AppSettings />} />
       </Route>
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
