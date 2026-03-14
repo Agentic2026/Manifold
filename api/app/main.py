@@ -3,6 +3,8 @@
 import asyncio
 import contextlib
 import json
+import logging
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -20,9 +22,27 @@ from h4ckath0n.realtime import (
 )
 from app.routers import include_all_routers
 
+logger = logging.getLogger(__name__)
+
+
+async def _ensure_tables() -> None:
+    """Create all SQLAlchemy tables if they do not already exist."""
+    from app.core.database import engine, Base
+    import app.models  # noqa: F401 — ensure every model is registered on Base.metadata
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ensured.")
+
+
 app = create_app()
 add_csp_middleware(app)
 include_all_routers(app)
+
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    await _ensure_tables()
 
 
 class HealthzResponse(BaseModel):

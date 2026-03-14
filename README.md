@@ -44,29 +44,65 @@ Manifold is composed of three core layers:
 
 ## Quick Start
 
-### Local Development
-
-```bash
-# Start both API and web servers
-cd api
-uv run h4ckath0n dev
-```
-
-The API runs at http://localhost:8000 and the web UI at http://localhost:5173.
-
-### Docker Compose
+### Docker Compose (recommended)
 
 ```bash
 cp .env.example .env   # edit values as needed
 docker compose up --build
 ```
 
-| Service  | Port | Description                             |
-|----------|------|-----------------------------------------|
-| `api`    | 8000 | FastAPI backend (metrics ingestion, LLM agent, AEGIS API) |
-| `worker` | —    | Background job processor                |
-| `redis`  | 6379 | Job queue and pub/sub                   |
-| `web`    | 5173 | React frontend served by nginx          |
+This starts PostgreSQL, the API, Redis, the web frontend, and a cAdvisor instance.
+The API auto-creates all database tables on startup — no manual migration step needed.
+
+| Service    | Port | Description                             |
+|------------|------|-----------------------------------------|
+| `db`       | 5432 | PostgreSQL 16 (data persistence)        |
+| `api`      | 8000 | FastAPI backend (metrics ingestion, LLM agent, AEGIS API) |
+| `worker`   | —    | Background job processor                |
+| `redis`    | 6379 | Job queue and pub/sub                   |
+| `web`      | 5173 | React frontend served by nginx          |
+| `cadvisor` | 8080 | Container metrics collector (pushes to API) |
+
+### Verify Ingestion (Smoke Test)
+
+Once the stack is running, verify end-to-end ingestion:
+
+```bash
+# Run the automated smoke test
+./scripts/smoke_test.sh
+
+# Or check manually:
+curl http://localhost:8000/healthz
+curl http://localhost:8000/ingest/stats
+```
+
+The `/ingest/stats` endpoint returns counts of machines, containers, and metric
+snapshots persisted in the database plus the timestamp of the latest snapshot.
+
+### Drop-in cAdvisor for Client Environments
+
+To add Manifold monitoring to any existing Docker Compose stack:
+
+```bash
+# Set the Manifold backend URL and token
+export MANIFOLD_API_URL=http://<manifold-host>:8000/cadvisor/batch
+export MANIFOLD_API_TOKEN=my-secret-token
+
+# Add cAdvisor as an overlay
+docker compose -f docker-compose.yml -f path/to/docker-compose.cadvisor.yml up -d
+```
+
+See `docker-compose.cadvisor.yml` for the reusable drop-in snippet.
+
+### Local Development (without Docker)
+
+```bash
+# Start both API and web servers (requires local PostgreSQL)
+cd api
+uv run h4ckath0n dev
+```
+
+The API runs at http://localhost:8000 and the web UI at http://localhost:5173.
 
 ## Repository Structure
 
@@ -193,6 +229,7 @@ Set `H4CKATH0N_DEMO_MODE=true` to seed demo data on startup, including a sample 
 | Method | Path               | Description                          |
 |--------|--------------------|--------------------------------------|
 | POST   | `/cadvisor/batch`  | Ingest a batch of cAdvisor container metrics (Bearer token required) |
+| GET    | `/ingest/stats`    | Get ingest counts (machines, containers, snapshots) |
 
 ### Dashboard & LLM
 
@@ -277,7 +314,8 @@ Copy `.env.example` to `.env` and configure:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `H4CKATH0N_DATABASE_URL` | sqlite | Database connection string |
+| `DATABASE_URL` | `postgresql+asyncpg://…` | Async database URL for Manifold telemetry/topology |
+| `H4CKATH0N_DATABASE_URL` | `postgresql+psycopg://…` | Database URL for the h4ckath0n auth framework |
 | `H4CKATH0N_REDIS_URL` | — | Redis URL for job queue |
 | `H4CKATH0N_STORAGE_DIR` | `.h4ckath0n_storage` | File upload directory |
 | `H4CKATH0N_EMAIL_BACKEND` | `file` | Email backend (`file` or `smtp`) |

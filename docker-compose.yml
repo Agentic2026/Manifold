@@ -1,4 +1,20 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: manifold
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: .
@@ -7,12 +23,19 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      # Override for Docker networking (db hostname instead of localhost)
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/manifold
+      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/manifold
+      H4CKATH0N_REDIS_URL: redis://redis:6379
     volumes:
-      # These paths must match H4CKATH0N_STORAGE_DIR and H4CKATH0N_EMAIL_OUTBOX_DIR in .env
       - uploads:/app/.h4ckath0n_storage
       - email_outbox:/app/.h4ckath0n_email_outbox
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   worker:
     build:
@@ -21,10 +44,17 @@ services:
       target: api
     command: ["uv", "run", "python", "-m", "h4ckath0n", "jobs", "worker"]
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/manifold
+      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/manifold
+      H4CKATH0N_REDIS_URL: redis://redis:6379
     volumes:
       - uploads:/app/.h4ckath0n_storage
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   redis:
     image: redis:8-alpine
@@ -38,6 +68,28 @@ services:
     ports:
       - "5173:80"
 
+  cadvisor:
+    image: ghcr.io/agentic2026/cadvisor:latest
+    command:
+      - --storage_driver=httpapi
+      - --storage_driver_buffer_duration=15s
+      - --housekeeping_interval=15s
+    environment:
+      CADVISOR_METRICS_API_URL: http://api:8000/cadvisor/batch
+      CADVISOR_METRICS_API_TOKEN: ${CADVISOR_METRICS_API_TOKEN:-my-secret-token}
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+
 volumes:
+  pgdata:
   uploads:
   email_outbox:

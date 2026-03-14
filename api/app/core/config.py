@@ -7,7 +7,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
 settings = Settings()
+
+
+def get_sync_database_url() -> str:
+    """Return a sync-compatible version of the database URL for scripts."""
+    url = settings.database_url
+    if "+asyncpg" in url:
+        return url.replace("+asyncpg", "+psycopg")
+    return url
