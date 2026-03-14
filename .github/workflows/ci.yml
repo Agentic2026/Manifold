@@ -56,6 +56,31 @@ jobs:
         working-directory: web
 
   # ──────────────────────────────────────────────
+  # Backend unit tests (pytest)
+  # ──────────────────────────────────────────────
+  backend-test:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install backend dependencies
+        run: uv sync --locked --all-extras
+        working-directory: api
+
+      - name: Run pytest
+        run: uv run pytest tests/ -v
+        working-directory: api
+        env:
+          CADVISOR_METRICS_API_TOKEN: "test-secret-123"
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+
+
+  # ──────────────────────────────────────────────
   # E2E tests with Playwright
   # ──────────────────────────────────────────────
   e2e:
@@ -105,7 +130,7 @@ jobs:
   # ──────────────────────────────────────────────
   build-api:
     name: Build API (${{ matrix.platform }})
-    needs: [test, e2e]
+    needs: [test, backend-test, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -154,7 +179,7 @@ jobs:
 
   build-web:
     name: Build Web (${{ matrix.platform }})
-    needs: [test, e2e]
+    needs: [test, backend-test, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
     strategy:
