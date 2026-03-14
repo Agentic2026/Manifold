@@ -36,10 +36,6 @@ export type RegisterRequest = components["schemas"]["RegisterRequest"];
 /** Request body for POST /auth/login */
 export type LoginRequest = components["schemas"]["LoginRequest"];
 
-/** Request body for POST /auth/passkey/register/start */
-export type PasskeyRegisterStartRequest =
-  components["schemas"]["PasskeyRegisterStartRequest"];
-
 // ── User-defined (demo) types ─────────────────────────────────────────────
 
 /** Response body for GET /demo/ping */

@@ -1,6 +1,127 @@
 {
   "components": {
     "schemas": {
+      "Body_create_upload_uploads_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_upload_uploads_post",
+        "type": "object"
+      },
+      "CadvisorBatchPayloadSchema": {
+        "properties": {
+          "machine_name": {
+            "title": "Machine Name",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/CadvisorSampleSchema"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sent_at": {
+            "title": "Sent At",
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema_version",
+          "sent_at",
+          "machine_name",
+          "source",
+          "samples"
+        ],
+        "title": "CadvisorBatchPayloadSchema",
+        "type": "object"
+      },
+      "CadvisorSampleSchema": {
+        "properties": {
+          "container_reference": {
+            "$ref": "#/components/schemas/ContainerReferenceSchema"
+          },
+          "container_spec": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Spec"
+          },
+          "stats": {
+            "additionalProperties": true,
+            "title": "Stats",
+            "type": "object"
+          }
+        },
+        "required": [
+          "container_reference",
+          "stats"
+        ],
+        "title": "CadvisorSampleSchema",
+        "type": "object"
+      },
+      "ContainerReferenceSchema": {
+        "properties": {
+          "aliases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliases"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ContainerReferenceSchema",
+        "type": "object"
+      },
       "DeviceBindingResponse": {
         "properties": {
           "device_id": {
@@ -127,6 +248,99 @@
         "title": "HealthzResponse",
         "type": "object"
       },
+      "JobItem": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "progress",
+          "error",
+          "created_at"
+        ],
+        "title": "JobItem",
+        "type": "object"
+      },
+      "LLMInsight": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nodeId": {
+            "title": "Nodeid",
+            "type": "string"
+          },
+          "nodeName": {
+            "title": "Nodename",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nodeId",
+          "nodeName",
+          "type",
+          "summary",
+          "details",
+          "timestamp",
+          "confidence"
+        ],
+        "title": "LLMInsight",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "device_label": {
@@ -185,6 +399,63 @@
           "message"
         ],
         "title": "MessageResponse",
+        "type": "object"
+      },
+      "NodeAnalysis": {
+        "properties": {
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "findings",
+          "recommendations"
+        ],
+        "title": "NodeAnalysis",
+        "type": "object"
+      },
+      "NodeTelemetry": {
+        "properties": {
+          "egressMbps": {
+            "title": "Egressmbps",
+            "type": "number"
+          },
+          "errorRate": {
+            "title": "Errorrate",
+            "type": "number"
+          },
+          "ingressMbps": {
+            "title": "Ingressmbps",
+            "type": "number"
+          },
+          "latencyMs": {
+            "title": "Latencyms",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ingressMbps",
+          "egressMbps",
+          "latencyMs",
+          "errorRate"
+        ],
+        "title": "NodeTelemetry",
         "type": "object"
       },
       "PasskeyAddFinishRequest": {
@@ -635,6 +906,52 @@
         "title": "PingResponse",
         "type": "object"
       },
+      "RBACPolicy": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lastModified": {
+            "title": "Lastmodified",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "riskLevel": {
+            "title": "Risklevel",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "subject",
+          "permissions",
+          "scope",
+          "lastModified",
+          "riskLevel"
+        ],
+        "title": "RBACPolicy",
+        "type": "object"
+      },
       "RegisterRequest": {
         "properties": {
           "device_label": {
@@ -695,6 +1012,253 @@
         "title": "RootResponse",
         "type": "object"
       },
+      "SessionResponse": {
+        "properties": {
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "device_id",
+          "role",
+          "scopes"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "TopologyData": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/TopologyEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "lastUpdated": {
+            "title": "Lastupdated",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/TopologyNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "scanStatus": {
+            "title": "Scanstatus",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "lastUpdated",
+          "scanStatus"
+        ],
+        "title": "TopologyData",
+        "type": "object"
+      },
+      "TopologyEdge": {
+        "properties": {
+          "animated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "title": "Animated"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target",
+          "kind",
+          "label"
+        ],
+        "title": "TopologyEdge",
+        "type": "object"
+      },
+      "TopologyNode": {
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "position": {
+            "additionalProperties": true,
+            "title": "Position",
+            "type": "object"
+          },
+          "serviceId": {
+            "title": "Serviceid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "telemetry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeTelemetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "serviceId",
+          "status",
+          "type",
+          "position"
+        ],
+        "title": "TopologyNode",
+        "type": "object"
+      },
+      "UploadItem": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "extraction_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Job Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "original_filename",
+          "content_type",
+          "byte_size",
+          "extraction_job_id",
+          "created_at"
+        ],
+        "title": "UploadItem",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -734,11 +1298,74 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "Vulnerability": {
+        "properties": {
+          "affectedNode": {
+            "title": "Affectednode",
+            "type": "string"
+          },
+          "affectedNodeId": {
+            "title": "Affectednodeid",
+            "type": "string"
+          },
+          "cve": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cve"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "discoveredAt": {
+            "title": "Discoveredat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "affectedNode",
+          "affectedNodeId",
+          "description",
+          "discoveredAt",
+          "status"
+        ],
+        "title": "Vulnerability",
+        "type": "object"
       }
     },
     "securitySchemes": {
       "DeviceJWT": {
         "description": "Device-signed ES256 JWT minted by the client. The JWT header must include kid set to the device id, and the aud claim must be h4ckath0n:http.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "HTTPBearer": {
         "scheme": "bearer",
         "type": "http"
       }
@@ -768,6 +1395,211 @@
           }
         },
         "summary": "Welcome"
+      }
+    },
+    "/api/insights": {
+      "get": {
+        "operationId": "get_insights_api_insights_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LLMInsight"
+                  },
+                  "title": "Response Get Insights Api Insights Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Insights",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/rbac": {
+      "get": {
+        "operationId": "get_rbac_api_rbac_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RBACPolicy"
+                  },
+                  "title": "Response Get Rbac Api Rbac Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Rbac",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/rbac/{node_id}/revoke": {
+      "post": {
+        "operationId": "revoke_rbac_api_rbac__node_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revoke Rbac Api Rbac  Node Id  Revoke Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Rbac",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/topology": {
+      "get": {
+        "operationId": "get_topology_api_topology_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopologyData"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Topology",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/topology/scan": {
+      "post": {
+        "operationId": "run_scan_api_topology_scan_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopologyData"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Scan",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/topology/{node_id}/isolate": {
+      "post": {
+        "operationId": "isolate_node_api_topology__node_id__isolate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Isolate Node Api Topology  Node Id  Isolate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Isolate Node",
+        "tags": [
+          "aegis"
+        ]
+      }
+    },
+    "/api/vulnerabilities": {
+      "get": {
+        "operationId": "get_vulnerabilities_api_vulnerabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Vulnerability"
+                  },
+                  "title": "Response Get Vulnerabilities Api Vulnerabilities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Vulnerabilities",
+        "tags": [
+          "aegis"
+        ]
       }
     },
     "/auth/login": {
@@ -1443,6 +2275,75 @@
         ]
       }
     },
+    "/auth/session": {
+      "get": {
+        "operationId": "get_session_auth_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Session",
+        "tags": [
+          "auth_ext"
+        ]
+      }
+    },
+    "/cadvisor/batch": {
+      "post": {
+        "operationId": "ingest_cadvisor_batch_cadvisor_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadvisorBatchPayloadSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Ingest Cadvisor Batch Cadvisor Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ingest Cadvisor Batch",
+        "tags": [
+          "ingest"
+        ]
+      }
+    },
     "/demo/echo": {
       "post": {
         "description": "Echo back the message along with its reverse.",
@@ -1578,6 +2479,118 @@
           }
         },
         "summary": "Health check"
+      }
+    },
+    "/jobs": {
+      "get": {
+        "operationId": "get_jobs_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobItem"
+                  },
+                  "title": "Response Get Jobs Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Jobs",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/llm/chat/stream": {
+      "post": {
+        "operationId": "chat_stream_llm_chat_stream_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Chat Stream Llm Chat Stream Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Chat Stream",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/uploads": {
+      "get": {
+        "operationId": "get_uploads_uploads_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UploadItem"
+                  },
+                  "title": "Response Get Uploads Uploads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Uploads",
+        "tags": [
+          "dashboard"
+        ]
+      },
+      "post": {
+        "operationId": "create_upload_uploads_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_upload_uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Upload Uploads Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Upload",
+        "tags": [
+          "dashboard"
+        ]
       }
     }
   }

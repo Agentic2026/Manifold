@@ -24,6 +24,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Insights */
+        get: operations["get_insights_api_insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rbac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Rbac */
+        get: operations["get_rbac_api_rbac_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rbac/{node_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Rbac */
+        post: operations["revoke_rbac_api_rbac__node_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/topology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Topology */
+        get: operations["get_topology_api_topology_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/topology/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Scan */
+        post: operations["run_scan_api_topology_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/topology/{node_id}/isolate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Isolate Node */
+        post: operations["isolate_node_api_topology__node_id__isolate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vulnerabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Vulnerabilities */
+        get: operations["get_vulnerabilities_api_vulnerabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -284,6 +403,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cadvisor/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest Cadvisor Batch */
+        post: operations["ingest_cadvisor_batch_cadvisor_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demo/echo": {
         parameters: {
             query?: never;
@@ -384,10 +537,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Jobs */
+        get: operations["get_jobs_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/llm/chat/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chat Stream */
+        post: operations["chat_stream_llm_chat_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Uploads */
+        get: operations["get_uploads_uploads_get"];
+        put?: never;
+        /** Create Upload */
+        post: operations["create_upload_uploads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_create_upload_uploads_post */
+        Body_create_upload_uploads_post: {
+            /** File */
+            file: string;
+        };
+        /** CadvisorBatchPayloadSchema */
+        CadvisorBatchPayloadSchema: {
+            /** Machine Name */
+            machine_name: string;
+            /** Samples */
+            samples: components["schemas"]["CadvisorSampleSchema"][];
+            /** Schema Version */
+            schema_version: string;
+            /** Sent At */
+            sent_at: string;
+            /** Source */
+            source: {
+                [key: string]: string;
+            };
+        };
+        /** CadvisorSampleSchema */
+        CadvisorSampleSchema: {
+            container_reference: components["schemas"]["ContainerReferenceSchema"];
+            /** Container Spec */
+            container_spec?: {
+                [key: string]: unknown;
+            } | null;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            };
+        };
+        /** ContainerReferenceSchema */
+        ContainerReferenceSchema: {
+            /** Aliases */
+            aliases?: string[] | null;
+            /** Name */
+            name: string;
+            /** Namespace */
+            namespace?: string | null;
+        };
         /** DeviceBindingResponse */
         DeviceBindingResponse: {
             /**
@@ -461,6 +707,40 @@ export interface components {
              */
             status: string;
         };
+        /** JobItem */
+        JobItem: {
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Progress */
+            progress: number;
+            /** Status */
+            status: string;
+        };
+        /** LLMInsight */
+        LLMInsight: {
+            /** Confidence */
+            confidence: number;
+            /** Details */
+            details: string;
+            /** Id */
+            id: string;
+            /** Nodeid */
+            nodeId: string;
+            /** Nodename */
+            nodeName: string;
+            /** Summary */
+            summary: string;
+            /** Timestamp */
+            timestamp: string;
+            /** Type */
+            type: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -494,6 +774,26 @@ export interface components {
              * @description Human-readable response message.
              */
             message: string;
+        };
+        /** NodeAnalysis */
+        NodeAnalysis: {
+            /** Findings */
+            findings: string[];
+            /** Recommendations */
+            recommendations: string[];
+            /** Summary */
+            summary: string;
+        };
+        /** NodeTelemetry */
+        NodeTelemetry: {
+            /** Egressmbps */
+            egressMbps: number;
+            /** Errorrate */
+            errorRate: number;
+            /** Ingressmbps */
+            ingressMbps: number;
+            /** Latencyms */
+            latencyMs: number;
         };
         /** PasskeyAddFinishRequest */
         PasskeyAddFinishRequest: {
@@ -752,6 +1052,23 @@ export interface components {
              */
             ok: boolean;
         };
+        /** RBACPolicy */
+        RBACPolicy: {
+            /** Id */
+            id: string;
+            /** Lastmodified */
+            lastModified: string;
+            /** Permissions */
+            permissions: string[];
+            /** Risklevel */
+            riskLevel: string;
+            /** Role */
+            role: string;
+            /** Scope */
+            scope: string;
+            /** Subject */
+            subject: string;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /**
@@ -786,6 +1103,86 @@ export interface components {
              */
             message: string;
         };
+        /** SessionResponse */
+        SessionResponse: {
+            /** Device Id */
+            device_id: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Role */
+            role: string;
+            /** Scopes */
+            scopes: string[];
+            /** User Id */
+            user_id: string;
+        };
+        /** TopologyData */
+        TopologyData: {
+            /** Edges */
+            edges: components["schemas"]["TopologyEdge"][];
+            /** Lastupdated */
+            lastUpdated: string;
+            /** Nodes */
+            nodes: components["schemas"]["TopologyNode"][];
+            /** Scanstatus */
+            scanStatus: string;
+        };
+        /** TopologyEdge */
+        TopologyEdge: {
+            /**
+             * Animated
+             * @default false
+             */
+            animated: boolean | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** TopologyNode */
+        TopologyNode: {
+            analysis?: components["schemas"]["NodeAnalysis"] | null;
+            /** Description */
+            description?: string | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Position */
+            position: {
+                [key: string]: unknown;
+            };
+            /** Serviceid */
+            serviceId: string;
+            /** Status */
+            status: string;
+            telemetry?: components["schemas"]["NodeTelemetry"] | null;
+            /** Type */
+            type: string;
+        };
+        /** UploadItem */
+        UploadItem: {
+            /** Byte Size */
+            byte_size: number;
+            /** Content Type */
+            content_type: string;
+            /** Created At */
+            created_at: string;
+            /** Extraction Job Id */
+            extraction_job_id: string | null;
+            /** Id */
+            id: string;
+            /** Original Filename */
+            original_filename: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -798,6 +1195,27 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Vulnerability */
+        Vulnerability: {
+            /** Affectednode */
+            affectedNode: string;
+            /** Affectednodeid */
+            affectedNodeId: string;
+            /** Cve */
+            cve?: string | null;
+            /** Description */
+            description: string;
+            /** Discoveredat */
+            discoveredAt: string;
+            /** Id */
+            id: string;
+            /** Severity */
+            severity: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
         };
     };
     responses: never;
@@ -824,6 +1242,172 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RootResponse"];
+                };
+            };
+        };
+    };
+    get_insights_api_insights_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMInsight"][];
+                };
+            };
+        };
+    };
+    get_rbac_api_rbac_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RBACPolicy"][];
+                };
+            };
+        };
+    };
+    revoke_rbac_api_rbac__node_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_topology_api_topology_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopologyData"];
+                };
+            };
+        };
+    };
+    run_scan_api_topology_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopologyData"];
+                };
+            };
+        };
+    };
+    isolate_node_api_topology__node_id__isolate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_vulnerabilities_api_vulnerabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vulnerability"][];
                 };
             };
         };
@@ -1357,6 +1941,61 @@ export interface operations {
             };
         };
     };
+    get_session_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    ingest_cadvisor_batch_cadvisor_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CadvisorBatchPayloadSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     demo_echo_demo_echo_post: {
         parameters: {
             query?: never;
@@ -1481,6 +2120,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthzResponse"];
+                };
+            };
+        };
+    };
+    get_jobs_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobItem"][];
+                };
+            };
+        };
+    };
+    chat_stream_llm_chat_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_uploads_uploads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadItem"][];
+                };
+            };
+        };
+    };
+    create_upload_uploads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_upload_uploads_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
