@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router";
-import { Layout } from "./components/Layout";
+import { AegisLayout } from "./components/AegisLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -20,7 +20,7 @@ export function App() {
       <Route
         element={
           <ProtectedRoute>
-            <Layout />
+            <AegisLayout />
           </ProtectedRoute>
         }
       >

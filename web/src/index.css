@@ -85,3 +85,24 @@ html[data-theme="light"] {
     opacity: 1 !important;
   }
 }
+
+/* ── Keyframe animations ─────────────────────────────── */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes shrink-width {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}

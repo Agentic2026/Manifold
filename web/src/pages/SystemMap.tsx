@@ -7,12 +7,8 @@ import {
   useNodesState,
   useEdgesState,
   type NodeProps,
-  type EdgeProps,
   type Node,
   type Edge,
-  BaseEdge,
-  EdgeLabelRenderer,
-  getBezierPath,
   MarkerType,
   Handle,
   Position,
@@ -36,6 +32,7 @@ import {
   Clock,
   ChevronRight,
   RefreshCw,
+  BrainCircuit,
 } from "lucide-react";
 import {
   aegisApi,
@@ -45,6 +42,9 @@ import {
   type NodeStatus,
 } from "../api/aegis";
 import { cn } from "../lib/utils";
+import { AnimatedParticleEdge } from "../components/AnimatedParticleEdge";
+import { useToast } from "../context/ToastContext";
+import { useChat } from "../context/ChatContext";
 
 // ────────────────────────────────────────────────────────────
 // Icons per service type
@@ -176,73 +176,6 @@ function ServiceNode({ data, selected }: NodeProps) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Custom Edge
-// ────────────────────────────────────────────────────────────
-
-interface AegisEdgeData {
-  kind: "network" | "api";
-  label: string;
-  [key: string]: unknown;
-}
-
-function AegisEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  data,
-  markerEnd,
-}: EdgeProps) {
-  const d = data as AegisEdgeData | undefined;
-  const isApi = d?.kind === "api";
-
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
-  return (
-    <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={{
-          stroke: isApi
-            ? "var(--color-primary)"
-            : "var(--color-border)",
-          strokeWidth: isApi ? 1.5 : 1,
-          strokeDasharray: isApi ? "6 3" : undefined,
-          opacity: 0.75,
-        }}
-      />
-      {d?.label && (
-        <EdgeLabelRenderer>
-          <div
-            style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: "all",
-            }}
-            className="absolute nodrag nopan"
-          >
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-surface-raised border border-border text-text-muted shadow-sm whitespace-nowrap">
-              {d.label}
-            </span>
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
 // Convert API data → React Flow format
 // ────────────────────────────────────────────────────────────
 
@@ -260,20 +193,28 @@ function toRFNode(n: TopologyNode): Node {
   };
 }
 
+// Node status lookup for edge coloring (populated on load)
+let nodeStatusMap: Record<string, string> = {};
+
 function toRFEdge(e: TopologyEdge): Edge {
   return {
     id: e.id,
     source: e.source,
     target: e.target,
-    type: "aegisEdge",
+    type: "particleEdge",
     animated: e.animated ?? false,
     markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
-    data: { kind: e.kind, label: e.label },
+    data: {
+      kind: e.kind,
+      label: e.label,
+      sourceStatus: nodeStatusMap[e.source] ?? "healthy",
+      targetStatus: nodeStatusMap[e.target] ?? "healthy",
+    },
   };
 }
 
 const NODE_TYPES = { serviceNode: ServiceNode };
-const EDGE_TYPES = { aegisEdge: AegisEdge };
+const EDGE_TYPES = { particleEdge: AnimatedParticleEdge };
 
 // ────────────────────────────────────────────────────────────
 // Telemetry card
@@ -309,11 +250,13 @@ function NodeInspector({
   onClose,
   onIsolate,
   onRevoke,
+  onAskAI,
 }: {
   node: TopologyNode;
   onClose: () => void;
   onIsolate: () => void;
   onRevoke: () => void;
+  onAskAI: () => void;
 }) {
   return (
     <aside className="w-80 flex-shrink-0 flex flex-col border-l border-border bg-surface overflow-hidden">
@@ -444,6 +387,13 @@ function NodeInspector({
       {/* Action buttons */}
       <div className="p-4 border-t border-border flex-shrink-0 space-y-2">
         <button
+          onClick={onAskAI}
+          className="w-full py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
+        >
+          <BrainCircuit className="w-3.5 h-3.5" />
+          Ask AI About This Node
+        </button>
+        <button
           onClick={onIsolate}
           className="w-full py-2 rounded-lg text-sm font-semibold bg-compromised text-white hover:bg-compromised/90 transition-colors"
         >
@@ -534,25 +484,43 @@ export function SystemMap() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState(3);
+  const { addToast } = useToast();
+  const { setNodeContext, setIsOpen: setChatOpen } = useChat();
 
-  // Initial load
+  // Sync selected node to chat context
   useEffect(() => {
-    aegisApi.getTopology().then((data) => {
-      setTopologyNodes(data.nodes);
-      setRfNodes(data.nodes.map(toRFNode));
-      setRfEdges(data.edges.map(toRFEdge));
-      setLastUpdated(new Date(data.lastUpdated));
-    });
-  }, [setRfNodes, setRfEdges]);
+    if (selectedNode) {
+      setNodeContext({
+        nodeId: selectedNode.id,
+        nodeName: selectedNode.label,
+        status: selectedNode.status,
+      });
+    }
+  }, [selectedNode, setNodeContext]);
 
-  const handleDeepScan = async () => {
-    setIsScanning(true);
-    const data = await aegisApi.runDeepScan();
+  const loadTopology = useCallback((data: { nodes: TopologyNode[]; edges: TopologyEdge[]; lastUpdated: string }) => {
+    // Build status map for edge coloring
+    nodeStatusMap = {};
+    for (const n of data.nodes) {
+      nodeStatusMap[n.id] = n.status;
+    }
     setTopologyNodes(data.nodes);
     setRfNodes(data.nodes.map(toRFNode));
     setRfEdges(data.edges.map(toRFEdge));
     setLastUpdated(new Date(data.lastUpdated));
+  }, [setRfNodes, setRfEdges]);
+
+  // Initial load
+  useEffect(() => {
+    aegisApi.getTopology().then(loadTopology);
+  }, [loadTopology]);
+
+  const handleDeepScan = async () => {
+    setIsScanning(true);
+    const data = await aegisApi.runDeepScan();
+    loadTopology(data);
     setIsScanning(false);
+    addToast({ title: "Deep scan complete", description: "Topology updated with latest findings.", variant: "info" });
   };
 
   const handleNodeClick = useCallback(
@@ -570,13 +538,25 @@ export function SystemMap() {
   const handleIsolate = async () => {
     if (!selectedNode) return;
     await aegisApi.isolateNode(selectedNode.id);
-    alert(`Entity "${selectedNode.label}" has been isolated.`);
+    addToast({
+      title: `"${selectedNode.label}" isolated`,
+      description: "All network traffic has been blocked for this entity.",
+      variant: "warning",
+    });
   };
 
   const handleRevoke = async () => {
     if (!selectedNode) return;
     await aegisApi.revokeRBAC(selectedNode.id);
-    alert(`RBAC roles for "${selectedNode.label}" have been revoked.`);
+    addToast({
+      title: `RBAC revoked for "${selectedNode.label}"`,
+      description: "All role bindings have been removed.",
+      variant: "success",
+    });
+  };
+
+  const handleAskAI = () => {
+    setChatOpen(true);
   };
 
   // Filter nodes by search
@@ -707,6 +687,7 @@ export function SystemMap() {
             onClose={() => setSelectedNode(null)}
             onIsolate={() => void handleIsolate()}
             onRevoke={() => void handleRevoke()}
+            onAskAI={handleAskAI}
           />
         )}
       </div>
