@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      # These paths must match H4CKATH0N_STORAGE_DIR and H4CKATH0N_EMAIL_OUTBOX_DIR in .env
+      - uploads:/app/.h4ckath0n_storage
+      - email_outbox:/app/.h4ckath0n_email_outbox
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    command: ["uv", "run", "python", "-m", "h4ckath0n", "jobs", "worker"]
+    env_file: .env
+    volumes:
+      - uploads:/app/.h4ckath0n_storage
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+
+volumes:
+  uploads:
+  email_outbox:

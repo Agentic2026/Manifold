@@ -1,0 +1,2326 @@
+{
+  "components": {
+    "schemas": {
+      "Body_upload_file_uploads_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_file_uploads_post",
+        "type": "object"
+      },
+      "ChatRequest": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional model override.",
+            "title": "Model"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional system prompt.",
+            "title": "System"
+          },
+          "user": {
+            "description": "User message.",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "ChatRequest",
+        "type": "object"
+      },
+      "DeviceBindingResponse": {
+        "properties": {
+          "device_id": {
+            "description": "Device ID that starts with the d prefix, empty when no device key is bound.",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human-facing display name for the user.",
+            "title": "Display Name"
+          },
+          "role": {
+            "description": "Server-side role for the user.",
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "User ID that starts with the u prefix.",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "device_id",
+          "role"
+        ],
+        "title": "DeviceBindingResponse",
+        "type": "object"
+      },
+      "EchoRequest": {
+        "properties": {
+          "message": {
+            "description": "Message to echo back.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "EchoRequest",
+        "type": "object"
+      },
+      "EchoResponse": {
+        "properties": {
+          "message": {
+            "description": "Original message.",
+            "title": "Message",
+            "type": "string"
+          },
+          "reversed": {
+            "description": "Reversed message.",
+            "title": "Reversed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "reversed"
+        ],
+        "title": "EchoResponse",
+        "type": "object"
+      },
+      "EnqueueJobRequest": {
+        "properties": {
+          "kind": {
+            "description": "Registered job kind.",
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "description": "Job payload.",
+            "title": "Payload",
+            "type": "object"
+          },
+          "queue": {
+            "default": "default",
+            "description": "Target queue name.",
+            "title": "Queue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "EnqueueJobRequest",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "description": "Standard error envelope for auth routes.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            ],
+            "description": "Error detail message or structured error payload.",
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "description": "Health status string.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "HealthzResponse": {
+        "properties": {
+          "status": {
+            "description": "Health check status.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthzResponse",
+        "type": "object"
+      },
+      "JobResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "integer"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "string"
+          },
+          "result_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Json"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "queue",
+          "status",
+          "progress",
+          "created_at"
+        ],
+        "title": "JobResponse",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "email": {
+            "description": "Account email for password-based login.",
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "Plaintext password to verify.",
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "description": "Human-readable response message.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse",
+        "type": "object"
+      },
+      "PasskeyAddFinishRequest": {
+        "properties": {
+          "credential": {
+            "additionalProperties": true,
+            "description": "Browser PublicKeyCredential response as JSON.",
+            "title": "Credential",
+            "type": "object"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "flow_id": {
+            "description": "Flow ID returned by add/start.",
+            "title": "Flow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flow_id",
+          "credential"
+        ],
+        "title": "PasskeyAddFinishRequest",
+        "type": "object"
+      },
+      "PasskeyAddStartResponse": {
+        "properties": {
+          "flow_id": {
+            "description": "Server-generated flow ID for add passkey.",
+            "title": "Flow Id",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": true,
+            "description": "PublicKeyCredentialCreationOptions payload as a JSON-safe dict.",
+            "title": "Options",
+            "type": "object"
+          }
+        },
+        "required": [
+          "flow_id",
+          "options"
+        ],
+        "title": "PasskeyAddStartResponse",
+        "type": "object"
+      },
+      "PasskeyFinishResponse": {
+        "properties": {
+          "device_id": {
+            "description": "Device ID that starts with the d prefix, empty when no device key is bound.",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional display name for the user, not set by default.",
+            "title": "Display Name"
+          },
+          "role": {
+            "description": "Server-side role for the user.",
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "User ID that starts with the u prefix.",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "device_id",
+          "role"
+        ],
+        "title": "PasskeyFinishResponse",
+        "type": "object"
+      },
+      "PasskeyInfo": {
+        "properties": {
+          "created_at": {
+            "description": "Creation timestamp in UTC.",
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "description": "Internal passkey ID that starts with the k prefix.",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last successful use timestamp.",
+            "title": "Last Used At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User-provided passkey name.",
+            "title": "Name"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revocation timestamp, if revoked.",
+            "title": "Revoked At"
+          }
+        },
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "PasskeyInfo",
+        "type": "object"
+      },
+      "PasskeyListResponse": {
+        "properties": {
+          "passkeys": {
+            "description": "Passkeys for the current user.",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyInfo"
+            },
+            "title": "Passkeys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "passkeys"
+        ],
+        "title": "PasskeyListResponse",
+        "type": "object"
+      },
+      "PasskeyLoginFinishRequest": {
+        "properties": {
+          "credential": {
+            "additionalProperties": true,
+            "description": "Browser PublicKeyCredential response as JSON.",
+            "title": "Credential",
+            "type": "object"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "flow_id": {
+            "description": "Flow ID returned by login/start.",
+            "title": "Flow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flow_id",
+          "credential"
+        ],
+        "title": "PasskeyLoginFinishRequest",
+        "type": "object"
+      },
+      "PasskeyLoginStartResponse": {
+        "properties": {
+          "flow_id": {
+            "description": "Server-generated flow ID for login.",
+            "title": "Flow Id",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": true,
+            "description": "PublicKeyCredentialRequestOptions payload as a JSON-safe dict.",
+            "title": "Options",
+            "type": "object"
+          }
+        },
+        "required": [
+          "flow_id",
+          "options"
+        ],
+        "title": "PasskeyLoginStartResponse",
+        "type": "object"
+      },
+      "PasskeyRegisterFinishRequest": {
+        "properties": {
+          "credential": {
+            "additionalProperties": true,
+            "description": "Browser PublicKeyCredential response as JSON.",
+            "title": "Credential",
+            "type": "object"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "flow_id": {
+            "description": "Flow ID returned by register/start.",
+            "title": "Flow Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flow_id",
+          "credential"
+        ],
+        "title": "PasskeyRegisterFinishRequest",
+        "type": "object"
+      },
+      "PasskeyRegisterStartRequest": {
+        "properties": {
+          "display_name": {
+            "description": "Human-facing display name for the new account.",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "PasskeyRegisterStartRequest",
+        "type": "object"
+      },
+      "PasskeyRegisterStartResponse": {
+        "properties": {
+          "flow_id": {
+            "description": "Server-generated flow ID for registration.",
+            "title": "Flow Id",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": true,
+            "description": "PublicKeyCredentialCreationOptions payload as a JSON-safe dict.",
+            "title": "Options",
+            "type": "object"
+          }
+        },
+        "required": [
+          "flow_id",
+          "options"
+        ],
+        "title": "PasskeyRegisterStartResponse",
+        "type": "object"
+      },
+      "PasskeyRenameRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New passkey name. Null or empty to clear.",
+            "title": "Name"
+          }
+        },
+        "title": "PasskeyRenameRequest",
+        "type": "object"
+      },
+      "PasskeyRenameResponse": {
+        "properties": {
+          "id": {
+            "description": "Internal passkey ID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated passkey name.",
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PasskeyRenameResponse",
+        "type": "object"
+      },
+      "PasskeyRevokeResponse": {
+        "properties": {
+          "message": {
+            "description": "Status message for the revocation action.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "PasskeyRevokeResponse",
+        "type": "object"
+      },
+      "PasswordResetConfirmSchema": {
+        "properties": {
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "new_password": {
+            "description": "New password to set for the account.",
+            "title": "New Password",
+            "type": "string"
+          },
+          "token": {
+            "description": "Password reset token issued by the server.",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmSchema",
+        "type": "object"
+      },
+      "PasswordResetRequestSchema": {
+        "properties": {
+          "email": {
+            "description": "Account email to send a reset token.",
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequestSchema",
+        "type": "object"
+      },
+      "PingResponse": {
+        "properties": {
+          "ok": {
+            "description": "True when the service is reachable.",
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "PingResponse",
+        "type": "object"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the device.",
+            "title": "Device Label"
+          },
+          "device_public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional device public key in JWK format to bind a device identity.",
+            "title": "Device Public Key Jwk"
+          },
+          "display_name": {
+            "description": "Human-facing display name for the account.",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "description": "Account email for password-based signup.",
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "Plaintext password, hashed server-side.",
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "display_name"
+        ],
+        "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RootResponse": {
+        "properties": {
+          "message": {
+            "description": "Welcome message.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "RootResponse",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "description": "Current authenticated session info.",
+        "properties": {
+          "device_id": {
+            "description": "Device ID from the verified JWT.",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name.",
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User email if set.",
+            "title": "Email"
+          },
+          "role": {
+            "description": "Server-side role.",
+            "title": "Role",
+            "type": "string"
+          },
+          "scopes": {
+            "description": "User scopes as a list.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "user_id": {
+            "description": "User ID.",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "device_id",
+          "role",
+          "scopes"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "UploadResponse": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "extraction_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Job Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "original_filename",
+          "content_type",
+          "byte_size",
+          "sha256",
+          "created_at"
+        ],
+        "title": "UploadResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "DeviceJWT": {
+        "description": "Device-signed ES256 JWT minted by the client. The JWT header must include kid set to the device id, and the aud claim must be h4ckath0n:http.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Hackathon app powered by h4ckath0n",
+    "title": "h4ckath0n",
+    "version": "0.1.9"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "description": "Default root route provided by h4ckath0n.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Welcome"
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "description": "Verify email and password, then bind an optional device key.",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid email or password."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login with password",
+        "tags": [
+          "password-auth",
+          "password-auth"
+        ]
+      }
+    },
+    "/auth/passkey/add/finish": {
+      "post": {
+        "description": "Verify the WebAuthn attestation and attach the new passkey to the user.",
+        "operationId": "add_finish_auth_passkey_add_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAddFinishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyFinishResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid or expired flow, or WebAuthn verification error."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid token."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Finish adding a passkey",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkey/add/start": {
+      "post": {
+        "description": "Begin adding a new passkey for the authenticated user and return registration options.",
+        "operationId": "add_start_auth_passkey_add_start_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyAddStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid token."
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Start adding a passkey",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkey/login/finish": {
+      "post": {
+        "description": "Finish passkey login by verifying the WebAuthn assertion for the flow and binding an optional device key.",
+        "operationId": "login_finish_auth_passkey_login_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyLoginFinishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyFinishResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid credentials, revoked passkey, or expired flow."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish passkey login",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkey/login/start": {
+      "post": {
+        "description": "Begin a username-less passkey login ceremony and return WebAuthn authentication options.",
+        "operationId": "login_start_auth_passkey_login_start_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyLoginStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start passkey login",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkey/register/finish": {
+      "post": {
+        "description": "Finish passkey registration by verifying the WebAuthn attestation for the flow and binding an optional device key.",
+        "operationId": "register_finish_auth_passkey_register_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterFinishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyFinishResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid or expired flow, or invalid WebAuthn payload."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish passkey registration",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkey/register/start": {
+      "post": {
+        "description": "Begin a passkey registration ceremony. Creates a new user and a single-use challenge flow, then returns WebAuthn registration options.",
+        "operationId": "register_start_auth_passkey_register_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegisterStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or WebAuthn configuration error."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start passkey registration",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkeys": {
+      "get": {
+        "description": "List all passkeys, including revoked entries, for the current user.",
+        "operationId": "passkeys_list_auth_passkeys_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid token."
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "List passkeys",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkeys/{key_id}": {
+      "patch": {
+        "description": "Update the user-facing name of a passkey.",
+        "operationId": "passkey_rename_auth_passkeys__key_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRenameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRenameResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid token."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Passkey not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Cannot rename a revoked passkey."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error."
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Rename a passkey",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/passkeys/{key_id}/revoke": {
+      "post": {
+        "description": "Revoke a passkey by its internal key ID. The last active passkey cannot be revoked and returns the LAST_PASSKEY error.",
+        "operationId": "passkey_revoke_auth_passkeys__key_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRevokeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid token."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Passkey not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "LAST_PASSKEY",
+                    "message": "Cannot revoke the last active passkey."
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Cannot revoke the last active passkey."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Revoke a passkey",
+        "tags": [
+          "passkey"
+        ]
+      }
+    },
+    "/auth/password-reset/confirm": {
+      "post": {
+        "description": "Confirm a password reset token, set a new password, and bind an optional device key.",
+        "operationId": "password_reset_confirm_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid or expired reset token."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm password reset",
+        "tags": [
+          "password-auth",
+          "password-auth"
+        ]
+      }
+    },
+    "/auth/password-reset/request": {
+      "post": {
+        "description": "Request a password reset token for the account. Returns the same message even when the email is unknown.",
+        "operationId": "password_reset_request_auth_password_reset_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request a password reset",
+        "tags": [
+          "password-auth",
+          "password-auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "description": "Create a new account using email and password, then bind an optional device key.",
+        "operationId": "register_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Email already registered."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register with password",
+        "tags": [
+          "password-auth",
+          "password-auth"
+        ]
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "description": "Return information about the currently authenticated session.",
+        "operationId": "get_session_auth_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Current session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/demo/echo": {
+      "post": {
+        "description": "Echo back the message along with its reverse.",
+        "operationId": "demo_echo_demo_echo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EchoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Demo echo",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/demo/ping": {
+      "get": {
+        "description": "Simple liveness ping for the demo namespace.",
+        "operationId": "demo_ping_demo_ping_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Demo ping",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/demo/sse": {
+      "get": {
+        "description": "Authenticated SSE stream that simulates chunked output. Requires a device JWT with aud set to h4ckath0n:sse.",
+        "operationId": "demo_sse_demo_sse_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Event stream with chunk and done events."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Missing token"
+                }
+              }
+            },
+            "description": "Missing or invalid device JWT."
+          }
+        },
+        "summary": "Demo SSE stream",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Basic health check for the app.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/healthz": {
+      "get": {
+        "description": "Readiness check for E2E and deployment probes.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health check"
+      }
+    },
+    "/jobs": {
+      "get": {
+        "description": "List recent jobs for the current user.",
+        "operationId": "list_jobs_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobResponse"
+                  },
+                  "title": "Response List Jobs Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "List jobs",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "description": "Create a new background job.",
+        "operationId": "create_job_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnqueueJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Enqueue a job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "description": "Get details of a specific job.",
+        "operationId": "get_job_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Get job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/llm/chat": {
+      "post": {
+        "description": "Non-streaming chat completion. Requires OpenAI API key.",
+        "operationId": "chat_llm_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Chat completion",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/chat/stream": {
+      "post": {
+        "description": "Stream LLM tokens via SSE. Requires OpenAI API key.",
+        "operationId": "chat_stream_llm_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Streaming chat completion",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/uploads": {
+      "get": {
+        "description": "List uploads for the current user.",
+        "operationId": "list_uploads_uploads_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UploadResponse"
+                  },
+                  "title": "Response List Uploads Uploads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "List uploads",
+        "tags": [
+          "uploads"
+        ]
+      },
+      "post": {
+        "description": "Upload a file (multipart/form-data).",
+        "operationId": "upload_file_uploads_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file_uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Upload a file",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/uploads/{upload_id}": {
+      "get": {
+        "operationId": "get_upload_uploads__upload_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Get upload metadata",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/uploads/{upload_id}/download": {
+      "get": {
+        "description": "Stream the file back to the owner.",
+        "operationId": "download_upload_uploads__upload_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Download a file",
+        "tags": [
+          "uploads"
+        ]
+      }
+    }
+  }
+}
