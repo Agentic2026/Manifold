@@ -1,8 +1,11 @@
 import os
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db_session
+from app.schemas.cadvisor import CadvisorBatchPayloadSchema
+from app.services.ingestion import process_cadvisor_batch
 
 router = APIRouter(tags=["ingest"])
 security = HTTPBearer()
@@ -11,31 +14,14 @@ def verify_cadvisor_token(credentials: HTTPAuthorizationCredentials = Security(s
     # Validate the token against configured secret
     expected_token = os.getenv("CADVISOR_METRICS_API_TOKEN", "my-secret-token")
     if credentials.credentials != expected_token:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return credentials.credentials
 
-class ContainerReference(BaseModel):
-    name: str
-    aliases: Optional[List[str]] = None
-    namespace: Optional[str] = None
-
-class CadvisorSample(BaseModel):
-    container_reference: ContainerReference
-    container_spec: Optional[Dict[str, Any]] = None
-    stats: Dict[str, Any]
-
-class CadvisorBatchPayload(BaseModel):
-    schema_version: str
-    sent_at: str
-    machine_name: str
-    source: Dict[str, str]
-    samples: List[CadvisorSample]
-
-@router.post("/cadvisor/batch", status_code=204)
-def ingest_cadvisor_batch(
-    payload: CadvisorBatchPayload, 
-    token: str = Depends(verify_cadvisor_token)
-) -> None:
-    # In a real scenario, push samples to timeseries DB, Kafka, etc.
-    # For now, we accept them successfully.
-    pass
+@router.post("/cadvisor/batch", status_code=status.HTTP_202_ACCEPTED)
+async def ingest_cadvisor_batch(
+    payload: CadvisorBatchPayloadSchema, 
+    token: str = Depends(verify_cadvisor_token),
+    db: AsyncSession = Depends(get_db_session)
+) -> dict:
+    processed_count = await process_cadvisor_batch(payload, db)
+    return {"status": "accepted", "samples_processed": processed_count}
