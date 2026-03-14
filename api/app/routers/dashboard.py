@@ -43,37 +43,97 @@ def get_jobs(user: Any = Depends(require_user)) -> List[JobItem]:
     return []
 
 class ChatRequest(BaseModel):
-    user: str
+    message: str
+    context: Optional[dict] = None
+
+
+# Context-aware mock responses for security analysis
+_CHAT_RESPONSES: dict = {
+    "compromised": (
+        "**CRITICAL: Node Compromise Detected**\n\n"
+        "This entity is actively compromised. Analysis shows:\n\n"
+        "- **Attack Vector**: Prompt injection via malicious PDF documents uploaded through the ingestion endpoint\n"
+        "- **Impact**: The agent is executing attacker-controlled instructions, bypassing content policy filters via role-play jailbreak\n"
+        "- **Exfiltration**: Anomalous tool call volume at 412 calls/min (baseline: 18). Outbound data transfer 3.8x above normal\n\n"
+        "**Immediate Remediation Steps**:\n"
+        "1. Isolate this entity to block all network traffic\n"
+        "2. Revoke all RBAC role bindings\n"
+        "3. Preserve tool call logs for forensic analysis\n"
+        "4. Redeploy with input sanitization middleware"
+    ),
+    "warning": (
+        "**WARNING: Anomalous Behavior Detected**\n\n"
+        "This node shows concerning patterns that warrant investigation:\n\n"
+        "- Traffic patterns deviate from 7-day baseline by 2x\n"
+        "- Potential downstream impact from compromised upstream services\n"
+        "- RBAC policies may need tightening\n\n"
+        "**Recommendations**:\n"
+        "1. Monitor egress traffic closely\n"
+        "2. Review and rotate credentials\n"
+        "3. Enable query-level audit logging"
+    ),
+    "healthy": (
+        "**Node Status: Healthy**\n\n"
+        "This entity is operating within normal parameters.\n\n"
+        "- All telemetry metrics within expected ranges\n"
+        "- No anomalous traffic patterns detected\n"
+        "- RBAC policies are correctly scoped\n\n"
+        "No immediate action required. Consider scheduling routine credential rotation."
+    ),
+    "default": (
+        "**Security Analysis Complete**\n\n"
+        "Based on the current system topology, I've identified the following:\n\n"
+        "1. **Active Threat**: The Context Agent (LLM-AGENT) shows signs of prompt injection compromise. "
+        "Egress traffic is 3.8x above baseline.\n\n"
+        "2. **Lateral Movement Risk**: The compromised agent has active MCP bridge access to the Core API Hub, "
+        "creating a potential exfiltration channel.\n\n"
+        "3. **Recommended Actions**:\n"
+        "   - Isolate the Context Agent immediately\n"
+        "   - Revoke `vector_read_role` and `mcp_bridge_role`\n"
+        "   - Audit all tool call logs from the last 6 hours\n"
+        "   - Deploy input sanitization middleware before restoring service"
+    ),
+}
+
 
 @router.post("/llm/chat/stream")
 async def chat_stream(request: Request) -> Any:
-    # Simulate an LLM streaming response
+    """Stream an AI security analysis response via SSE.
+
+    Accepts JSON body: {"message": str, "context"?: {"nodeId": str, "nodeName": str, "status": str}}
+    Returns SSE events with {"token": str} data.
+    """
+    # Auth is optional for the chat endpoint during hackathon demo
     try:
-        ctx = await authenticate_sse_request(request)
-    except AuthError as exc:
-        return JSONResponse({"detail": exc.detail}, status_code=401)
-        
+        await authenticate_sse_request(request)
+    except (AuthError, Exception):
+        pass  # Allow unauthenticated access for demo
+
     try:
         body = await request.json()
-        user_msg = body.get("user", "")
+        user_msg = body.get("message", "")
+        context = body.get("context")
     except Exception:
         user_msg = ""
-        
-    chunks = [
-        "Analyzing your request: ",
-        f"'{user_msg}'... ",
-        "Scanning internal knowledge base... ",
-        "No issues found.",
-    ]
+        context = None
 
+    # Pick response based on context status
+    status = context.get("status", "default") if context else "default"
+    response_text = _CHAT_RESPONSES.get(status, _CHAT_RESPONSES["default"])
+
+    # Stream token by token (simulating LLM output)
     async def generate():  # type: ignore[no-untyped-def]
-        for text in chunks:
+        # Stream in chunks of ~3 characters for realistic feel
+        i = 0
+        while i < len(response_text):
             if await request.is_disconnected():
                 return
+            chunk = response_text[i : i + 3]
             yield {
                 "event": "message",
-                "data": json.dumps({"token": text})
+                "data": json.dumps({"token": chunk}),
             }
-            await asyncio.sleep(0.3)
+            i += 3
+            await asyncio.sleep(0.015)
 
     return sse_response(generate())

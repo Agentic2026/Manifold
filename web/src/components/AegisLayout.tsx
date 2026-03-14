@@ -21,9 +21,15 @@ import {
   type ThemePreference,
 } from "../theme";
 import { cn } from "../lib/utils";
+import { ToastProvider } from "../context/ToastContext";
+import { ToastContainer } from "./Toast";
+import { ChatProvider } from "../context/ChatContext";
+import { AIChatPanel } from "./AIChatPanel";
+import { SecurityGauge } from "./SecurityGauge";
+import { aegisApi } from "../api/aegis";
 
 const NAV_ITEMS = [
-  { href: "/map",             label: "System Map",      icon: Network       },
+  { href: "/",                label: "System Map",      icon: Network       },
   { href: "/insights",        label: "LLM Insights",    icon: BrainCircuit  },
   { href: "/vulnerabilities", label: "Vulnerabilities", icon: Bug           },
   { href: "/rbac",            label: "RBAC Policies",   icon: KeyRound      },
@@ -71,6 +77,14 @@ export function AegisLayout() {
       ? false
       : getEffectiveTheme("system") === "dark",
   );
+  const [securityScore, setSecurityScore] = useState<{
+    score: number;
+    breakdown: { label: string; impact: number }[];
+  } | null>(null);
+
+  useEffect(() => {
+    aegisApi.computeSecurityScore().then(setSecurityScore);
+  }, []);
   const effectiveTheme: "light" | "dark" =
     themePreference === "system"
       ? systemIsDark
@@ -108,6 +122,8 @@ export function AegisLayout() {
   };
 
   return (
+    <ToastProvider>
+    <ChatProvider>
     <div className="flex h-screen overflow-hidden bg-surface">
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface-alt">
@@ -124,6 +140,16 @@ export function AegisLayout() {
           </div>
         </div>
 
+        {/* Security Gauge */}
+        {securityScore && (
+          <div className="border-b border-border">
+            <SecurityGauge
+              score={securityScore.score}
+              breakdown={securityScore.breakdown}
+            />
+          </div>
+        )}
+
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
@@ -133,7 +159,7 @@ export function AegisLayout() {
             <NavLink
               key={href}
               to={href}
-              end={href === "/map"}
+              end={href === "/"}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -162,7 +188,7 @@ export function AegisLayout() {
               Configure
             </p>
             <NavLink
-              to="/app-settings"
+              to="/settings"
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -204,6 +230,12 @@ export function AegisLayout() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <Outlet />
       </main>
+
+      {/* Floating overlays */}
+      <AIChatPanel />
+      <ToastContainer />
     </div>
+    </ChatProvider>
+    </ToastProvider>
   );
 }

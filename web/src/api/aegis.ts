@@ -560,4 +560,54 @@ export const aegisApi = {
       return { success: true };
     }
   },
+
+  /** Compute an aggregate security posture score from all data sources. */
+  computeSecurityScore: async (): Promise<{
+    score: number;
+    breakdown: { label: string; impact: number }[];
+  }> => {
+    const [topology, vulns, rbac] = await Promise.all([
+      aegisApi.getTopology(),
+      aegisApi.getVulnerabilities(),
+      aegisApi.getRBACPolicies(),
+    ]);
+
+    const breakdown: { label: string; impact: number }[] = [];
+    let score = 100;
+
+    const compromised = topology.nodes.filter((n) => n.status === "compromised").length;
+    const warning = topology.nodes.filter((n) => n.status === "warning").length;
+    if (compromised > 0) {
+      const impact = -20 * compromised;
+      breakdown.push({ label: `${compromised} compromised node${compromised > 1 ? "s" : ""}`, impact });
+      score += impact;
+    }
+    if (warning > 0) {
+      const impact = -10 * warning;
+      breakdown.push({ label: `${warning} warning node${warning > 1 ? "s" : ""}`, impact });
+      score += impact;
+    }
+
+    const critVulns = vulns.filter((v) => v.severity === "critical" && v.status === "open").length;
+    const highVulns = vulns.filter((v) => v.severity === "high" && v.status === "open").length;
+    if (critVulns > 0) {
+      const impact = -8 * critVulns;
+      breakdown.push({ label: `${critVulns} critical vuln${critVulns > 1 ? "s" : ""}`, impact });
+      score += impact;
+    }
+    if (highVulns > 0) {
+      const impact = -5 * highVulns;
+      breakdown.push({ label: `${highVulns} high vuln${highVulns > 1 ? "s" : ""}`, impact });
+      score += impact;
+    }
+
+    const highRisk = rbac.filter((p) => p.riskLevel === "high").length;
+    if (highRisk > 0) {
+      const impact = -3 * highRisk;
+      breakdown.push({ label: `${highRisk} high-risk RBAC`, impact });
+      score += impact;
+    }
+
+    return { score: Math.max(0, score), breakdown };
+  },
 };
