@@ -1,0 +1,32 @@
+# Manifold cAdvisor Drop-in Overlay
+# ──────────────────────────────────
+# Add this to any Docker Compose environment to start pushing container
+# telemetry to a Manifold backend.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.cadvisor.yml up -d
+#
+# Required env vars (set in .env or shell):
+#   MANIFOLD_API_URL   – e.g. http://manifold-api:8000/cadvisor/batch
+#   MANIFOLD_API_TOKEN – bearer token matching the backend's CADVISOR_METRICS_API_TOKEN
+
+services:
+  cadvisor:
+    image: ghcr.io/agentic2026/cadvisor:latest
+    command:
+      - --storage_driver=httpapi
+      - --storage_driver_buffer_duration=15s
+      - --housekeeping_interval=15s
+    environment:
+      CADVISOR_METRICS_API_URL: ${MANIFOLD_API_URL:-http://host.docker.internal:8000/cadvisor/batch}
+      CADVISOR_METRICS_API_TOKEN: ${MANIFOLD_API_TOKEN:-my-secret-token}
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
