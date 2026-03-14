@@ -10,10 +10,6 @@ import { LLMInsights } from "./pages/LLMInsights";
 import { Vulnerabilities } from "./pages/Vulnerabilities";
 import { RBACPolicies } from "./pages/RBACPolicies";
 import { AppSettings } from "./pages/AppSettings";
-import { Login } from "./pages/Login";
-import { Register } from "./pages/Register";
-import { ForgotPassword } from "./pages/ForgotPassword";
-import { ResetPassword } from "./pages/ResetPassword";
 
 export function App() {
   return (
