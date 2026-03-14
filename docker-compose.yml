@@ -76,7 +76,7 @@ services:
       - --housekeeping_interval=15s
     environment:
       CADVISOR_METRICS_API_URL: http://api:8000/cadvisor/batch
-      CADVISOR_METRICS_API_TOKEN: my-secret-token
+      CADVISOR_METRICS_API_TOKEN: ${CADVISOR_METRICS_API_TOKEN:-my-secret-token}
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
