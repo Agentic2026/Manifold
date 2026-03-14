@@ -18,9 +18,11 @@ from h4ckath0n.realtime import (
     authenticate_websocket,
     sse_response,
 )
+from app.routers import include_all_routers
 
 app = create_app()
 add_csp_middleware(app)
+include_all_routers(app)
 
 
 class HealthzResponse(BaseModel):
