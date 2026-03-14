@@ -36,7 +36,7 @@ export function Register() {
     setPasskeyLoading(true);
     try {
       await registerPasskey(trimmedName);
-      navigate("/dashboard");
+      navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Passkey registration failed");
     } finally {
@@ -54,7 +54,7 @@ export function Register() {
     setPasswordLoading(true);
     try {
       await registerPassword(trimmedName, trimmedEmail, password);
-      navigate("/dashboard");
+      navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Registration failed");
     } finally {
