@@ -21,11 +21,11 @@ const RISK_CONFIG: Record<
   },
 };
 
-function PolicyRow({ policy }: { policy: RBACPolicy }) {
+function PolicyRow({ policy, now }: { policy: RBACPolicy; now: number }) {
   const risk = RISK_CONFIG[policy.riskLevel];
   const modified = new Date(policy.lastModified);
   const daysSince = Math.floor(
-    (Date.now() - modified.getTime()) / (1000 * 60 * 60 * 24),
+    (now - modified.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   return (
@@ -90,6 +90,7 @@ function PolicyRow({ policy }: { policy: RBACPolicy }) {
 export function RBACPolicies() {
   const [policies, setPolicies] = useState<RBACPolicy[]>([]);
   const [filter, setFilter] = useState<RBACPolicy["riskLevel"] | "all">("all");
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     aegisApi.getRBACPolicies().then(setPolicies);
@@ -157,7 +158,7 @@ export function RBACPolicies() {
                 No policies found.
               </div>
             ) : (
-              sorted.map((policy) => <PolicyRow key={policy.id} policy={policy} />)
+              sorted.map((policy) => <PolicyRow key={policy.id} policy={policy} now={now} />)
             )}
           </div>
 

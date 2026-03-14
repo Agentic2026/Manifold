@@ -4,8 +4,6 @@ export { LLMInsights } from "./LLMInsights";
 export { Vulnerabilities } from "./Vulnerabilities";
 export { RBACPolicies } from "./RBACPolicies";
 export { AppSettings } from "./AppSettings";
-
-// Auth pages
 export { Login } from "./Login";
 export { Register } from "./Register";
 export { ForgotPassword } from "./ForgotPassword";

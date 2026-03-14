@@ -6,3 +6,5 @@ __pycache__/
 # Claude Code working directory (worktrees, settings)
 .claude/
 
+*.db
+.env
