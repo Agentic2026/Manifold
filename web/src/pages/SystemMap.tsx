@@ -338,7 +338,7 @@ function NodeInspector({
               {node.telemetry.lastSeen && (
                 <TelCard
                   label="Last Seen"
-                  value={new Date(node.telemetry.lastSeen).toLocaleTimeString()}
+                  value={(() => { try { return new Date(node.telemetry!.lastSeen!).toLocaleTimeString(); } catch { return "—"; } })()}
                 />
               )}
             </div>

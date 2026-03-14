@@ -16,7 +16,7 @@ def _resolve_topology_node_id(sample) -> str | None:
     3. ``None`` – container stays unmatched
     """
     spec = sample.container_spec or {}
-    labels = spec.get("labels", {}) or {}
+    labels = spec.get("labels") or {}
 
     compose_svc = labels.get("com.docker.compose.service")
     if compose_svc:

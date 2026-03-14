@@ -29,6 +29,11 @@ pass() { echo -e "${GREEN}✓ $1${NC}"; }
 fail() { echo -e "${RED}✗ $1${NC}"; exit 1; }
 info() { echo -e "${YELLOW}… $1${NC}"; }
 
+# Helper: extract a field from /ingest/stats JSON
+get_stat() {
+    curl -s "${API_BASE}/ingest/stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])" 2>/dev/null || echo "0"
+}
+
 echo "=== Manifold – Live cAdvisor Ingestion Test ==="
 echo "API:     ${API_BASE}"
 echo "Timeout: ${TIMEOUT}s"
@@ -49,7 +54,7 @@ done
 [ "$HEALTH_WAIT" -ge "$TIMEOUT" ] && fail "Backend did not become healthy within ${TIMEOUT}s"
 
 # ── 2. Record baseline snapshot count ──────────────────────
-BASELINE=$(curl -s "${API_BASE}/ingest/stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['snapshots'])" 2>/dev/null || echo "0")
+BASELINE=$(get_stat snapshots)
 info "Baseline snapshot count: ${BASELINE}"
 
 # ── 3. Wait for snapshot count to increase from background ingestion
@@ -58,8 +63,8 @@ ELAPSED=0
 while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
     sleep 5
     ELAPSED=$((ELAPSED + 5))
-    CURRENT=$(curl -s "${API_BASE}/ingest/stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['snapshots'])" 2>/dev/null || echo "0")
-    CONTAINERS=$(curl -s "${API_BASE}/ingest/stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['containers'])" 2>/dev/null || echo "0")
+    CURRENT=$(get_stat snapshots)
+    CONTAINERS=$(get_stat containers)
 
     if [ "$CURRENT" -gt "$BASELINE" ]; then
         echo ""

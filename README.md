@@ -68,8 +68,11 @@ The API auto-creates all database tables on startup — no manual migration step
 Once the stack is running, verify end-to-end ingestion:
 
 ```bash
-# Run the automated smoke test
+# Run the automated smoke test (synthetic POST)
 ./scripts/smoke_test.sh
+
+# Verify live cAdvisor-originated ingestion (no synthetic POST — waits for real data)
+./scripts/smoke_test_live_cadvisor.sh
 
 # Or check manually:
 curl http://localhost:8000/healthz
@@ -78,6 +81,25 @@ curl http://localhost:8000/ingest/stats
 
 The `/ingest/stats` endpoint returns counts of machines, containers, and metric
 snapshots persisted in the database plus the timestamp of the latest snapshot.
+
+### Import Topology from Docker Compose
+
+After the stack is running, import your Docker Compose document to create a
+topology graph:
+
+```bash
+# Import the project's own docker-compose.yml
+curl -X POST http://localhost:8000/api/topology/import \
+  -H "Content-Type: application/json" \
+  -d "{\"yaml_content\": $(python3 -c "import json; print(json.dumps(open('docker-compose.yml').read()))")}"
+
+# Inspect the resulting topology
+curl http://localhost:8000/api/topology | python3 -m json.tool
+```
+
+The topology import creates nodes from services and edges from `depends_on` /
+shared networks. Containers ingested by cAdvisor are deterministically matched
+to topology nodes via the `com.docker.compose.service` label.
 
 ### Drop-in cAdvisor for Client Environments
 
@@ -93,6 +115,9 @@ docker compose -f docker-compose.yml -f path/to/docker-compose.cadvisor.yml up -
 ```
 
 See `docker-compose.cadvisor.yml` for the reusable drop-in snippet.
+
+> **Linux note:** The overlay includes `extra_hosts: host.docker.internal:host-gateway`
+> so that `host.docker.internal` resolves correctly on Linux as well as Docker Desktop.
 
 ### Local Development (without Docker)
 

@@ -350,11 +350,18 @@ async def _aggregate_node_telemetry(
     if not snapshots:
         return None
 
+    # Use the most recent snapshot per container for throughput calculation
+    seen_containers: set[int] = set()
     total_rx_bytes = 0.0
     total_tx_bytes = 0.0
     latest_ts: Optional[datetime] = None
 
     for snap in snapshots:
+        # Only take the latest snapshot per container
+        if snap.container_id in seen_containers:
+            continue
+        seen_containers.add(snap.container_id)
+
         net = snap.network_stats
         if net and isinstance(net, dict):
             # cAdvisor network stats may be a dict of interfaces or a flat dict
@@ -369,8 +376,8 @@ async def _aggregate_node_telemetry(
         if latest_ts is None or snap.timestamp > latest_ts:
             latest_ts = snap.timestamp
 
-    ingress = _bytes_to_mbps(total_rx_bytes / max(len(snapshots), 1))
-    egress = _bytes_to_mbps(total_tx_bytes / max(len(snapshots), 1))
+    ingress = _bytes_to_mbps(total_rx_bytes)
+    egress = _bytes_to_mbps(total_tx_bytes)
 
     return NodeTelemetry(
         ingressMbps=ingress,
@@ -405,7 +412,10 @@ def _compute_node_status(
     # Staleness check
     if telemetry.lastSeen:
         try:
-            last_seen_dt = datetime.fromisoformat(telemetry.lastSeen)
+            ls = telemetry.lastSeen
+            if ls.endswith("Z"):
+                ls = ls[:-1] + "+00:00"
+            last_seen_dt = datetime.fromisoformat(ls)
             age = (datetime.now(UTC) - last_seen_dt).total_seconds()
             if age > _STALE_SECONDS:
                 return "warning"
