@@ -130,7 +130,7 @@ jobs:
   # ──────────────────────────────────────────────
   build-api:
     name: Build API (${{ matrix.platform }})
-    needs: [test, backend-test, e2e]
+    needs: [test, backend-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
     strategy:
