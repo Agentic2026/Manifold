@@ -1083,16 +1083,20 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
+    { name = "fastapi" },
     { name = "greenlet" },
     { name = "h4ckath0n" },
+    { name = "pydantic" },
     { name = "python-multipart" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=44.0" },
+    { name = "fastapi", specifier = ">=0.135.1" },
     { name = "greenlet", specifier = ">=3.3.2" },
     { name = "h4ckath0n", specifier = ">=0.1.9" },
+    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "python-multipart", specifier = ">=0.0.22" },
 ]
 
