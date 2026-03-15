@@ -3,11 +3,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 
+import logging
+
 from app.core.database import get_db_session
 from app.core.config import settings
 from app.schemas.cadvisor import CadvisorBatchPayloadSchema
 from app.services.ingestion import process_cadvisor_batch
 from app.models.telemetry import Machine, Container, ContainerMetricSnapshot
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ingest"])
 security = HTTPBearer()
@@ -43,8 +47,7 @@ async def ingest_cadvisor_batch(
         detection_events = len(events)
         nodes_updated = await apply_detection_statuses(db, summaries)
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error("Post-ingest detection failed: %s", exc)
+        logger.error("Post-ingest detection failed: %s", exc)
 
     return {
         "status": "accepted",

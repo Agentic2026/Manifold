@@ -132,7 +132,8 @@ async def test_ingestion_triggers_detector_and_updates_status():
             )
             assert resp2.status_code == 202
             body = resp2.json()
-            assert body["detection_events"] >= 1 or body["nodes_updated"] >= 0
+            # Egress burst should be detected under demo profile
+            assert body["detection_events"] >= 1
 
             # Topology should show the node as warning
             topo = await ac.get("/topology")
@@ -204,8 +205,9 @@ async def test_detector_events_feed_into_reports():
         assert len(reports) == 2  # deep_scan + security_posture
 
         deep_report = next(r for r in reports if r.report_kind == "deep_scan")
-        assert "det-test-001" in (deep_report.payload or {}).get("detection_event_ids", [])
-        assert "det-test-002" in (deep_report.payload or {}).get("detection_event_ids", [])
+        event_ids = (deep_report.payload or {}).get("detection_event_ids", [])
+        assert "det-test-001" in event_ids
+        assert "det-test-002" in event_ids
         assert "Egress burst" in deep_report.details_markdown
         assert "proj__api" in deep_report.details_markdown
         assert "detection" in deep_report.summary.lower()
