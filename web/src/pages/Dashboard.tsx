@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../auth";
 import { apiFetch } from "../auth/api";
 import { getOrMintToken } from "../auth/token";
+import { API_BASE } from "../lib/apiBase";
 import {
   Card,
   CardHeader,
@@ -71,7 +72,6 @@ export function Dashboard() {
       const formData = new FormData();
       formData.append("file", file);
       const token = await getOrMintToken("http");
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
       const res = await fetch(`${API_BASE}/uploads`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -93,14 +93,13 @@ export function Dashboard() {
     setAiResponse("");
     try {
       const token = await getOrMintToken("http");
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
       const res = await fetch(`${API_BASE}/llm/chat/stream`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ user: aiPrompt }),
+        body: JSON.stringify({ message: aiPrompt, context: {} }),
       });
       if (!res.ok || !res.body) {
         setAiResponse("Error: Could not connect to LLM service");

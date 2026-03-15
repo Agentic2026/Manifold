@@ -1,7 +1,6 @@
 import { getOrMintToken, clearCachedToken } from "./token";
 import { getDeviceIdentity } from "./deviceKey";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+import { API_BASE } from "../lib/apiBase";
 
 export class AuthError extends Error {
   constructor(message: string) {

@@ -10,8 +10,7 @@ import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./openapi";
 import { getOrMintToken, clearCachedToken } from "../auth/token";
 import { getDeviceIdentity } from "../auth/deviceKey";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+import { API_BASE } from "../lib/apiBase";
 
 /**
  * Middleware that attaches the device-signed JWT to every request and

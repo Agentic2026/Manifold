@@ -2,8 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth, getOrMintToken } from "../auth";
 import { Card, CardContent, CardHeader } from "../components/Card";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+import { API_BASE } from "../lib/apiBase";
 
 interface LogEntry {
   time: string;

@@ -7,8 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+import { API_BASE } from "../lib/apiBase";
 
 export interface NodeContext {
   nodeId: string;
@@ -81,7 +80,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Try real endpoint, fall back to mock
       const streamReal = async () => {
         try {
-          await fetchEventSource(`${BASE_URL}/llm/chat/stream`, {
+          await fetchEventSource(`${API_BASE}/llm/chat/stream`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -6,7 +6,7 @@
  * bundled below, so the UI works standalone during development.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api";
+import { API_BASE as BASE_URL } from "../lib/apiBase";
 
 // ────────────────────────────────────────────────────────────
 // Types
