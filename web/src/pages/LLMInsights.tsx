@@ -7,7 +7,7 @@ import {
   Clock,
   ChevronRight,
 } from "lucide-react";
-import { aegisApi, type LLMInsight, type InsightType } from "../api/aegis";
+import { manifoldApi, type LLMInsight, type InsightType } from "../api/manifold";
 import { cn } from "../lib/utils";
 
 const TYPE_CONFIG: Record<
@@ -103,7 +103,7 @@ export function LLMInsights() {
   const [filter, setFilter] = useState<InsightType | "all">("all");
 
   useEffect(() => {
-    aegisApi.getInsights().then(setInsights);
+    manifoldApi.getInsights().then(setInsights);
   }, []);
 
   const filtered =

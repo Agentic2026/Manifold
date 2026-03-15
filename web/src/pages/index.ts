@@ -1,4 +1,4 @@
-// AEGIS dashboard pages
+// Manifold dashboard pages
 export { SystemMap } from "./SystemMap";
 export { LLMInsights } from "./LLMInsights";
 export { Vulnerabilities } from "./Vulnerabilities";

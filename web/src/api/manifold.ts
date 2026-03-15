@@ -1,5 +1,5 @@
 /**
- * aegis.ts — Typed API client for the AEGIS.LLM backend.
+ * manifold.ts — Typed API client for the Manifold backend.
  *
  * All functions first try the real backend. If the request fails
  * (e.g. backend not yet running) they fall back to the mock data
@@ -522,7 +522,7 @@ async function fetchTopologyLive(): Promise<TopologyData | null> {
 // API client
 // ────────────────────────────────────────────────────────────
 
-export const aegisApi = {
+export const manifoldApi = {
   /**
    * Get the full topology graph (nodes + edges).
    *
@@ -570,7 +570,7 @@ export const aegisApi = {
       });
       return (await res.json()) as { success: boolean };
     } catch {
-      console.warn(`[aegis] isolateNode(${nodeId}) — using mock response`);
+      console.warn(`[manifold] isolateNode(${nodeId}) — using mock response`);
       return { success: true };
     }
   },
@@ -583,7 +583,7 @@ export const aegisApi = {
       });
       return (await res.json()) as { success: boolean };
     } catch {
-      console.warn(`[aegis] revokeRBAC(${nodeId}) — using mock response`);
+      console.warn(`[manifold] revokeRBAC(${nodeId}) — using mock response`);
       return { success: true };
     }
   },
@@ -613,9 +613,9 @@ export const aegisApi = {
     breakdown: { label: string; impact: number }[];
   }> => {
     const [topology, vulns, rbac] = await Promise.all([
-      aegisApi.getTopology(),
-      aegisApi.getVulnerabilities(),
-      aegisApi.getRBACPolicies(),
+      manifoldApi.getTopology(),
+      manifoldApi.getVulnerabilities(),
+      manifoldApi.getRBACPolicies(),
     ]);
 
     const breakdown: { label: string; impact: number }[] = [];

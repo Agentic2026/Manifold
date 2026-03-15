@@ -36,12 +36,12 @@ import {
   Network,
 } from "lucide-react";
 import {
-  aegisApi,
+  manifoldApi,
   type TopologyNode,
   type TopologyEdge,
   type ServiceType,
   type NodeStatus,
-} from "../api/aegis";
+} from "../api/manifold";
 import { cn } from "../lib/utils";
 import { AnimatedParticleEdge } from "../components/AnimatedParticleEdge";
 import { useToast } from "../context/ToastContext";
@@ -523,7 +523,7 @@ export function SystemMap() {
   }, [setRfNodes, setRfEdges]);
 
   const fetchTopology = useCallback(async () => {
-    const data = await aegisApi.getTopology();
+    const data = await manifoldApi.getTopology();
     if (data) {
       loadTopology(data);
       setDataSource(data.nodes.length > 0 ? "live" : "empty");
@@ -544,7 +544,7 @@ export function SystemMap() {
 
   const handleDeepScan = async () => {
     setIsScanning(true);
-    const data = await aegisApi.runDeepScan();
+    const data = await manifoldApi.runDeepScan();
     if (data) {
       loadTopology(data);
     }
@@ -566,7 +566,7 @@ export function SystemMap() {
 
   const handleIsolate = async () => {
     if (!selectedNode) return;
-    await aegisApi.isolateNode(selectedNode.id);
+    await manifoldApi.isolateNode(selectedNode.id);
     addToast({
       title: `"${selectedNode.label}" isolated`,
       description: "All network traffic has been blocked for this entity.",
@@ -576,7 +576,7 @@ export function SystemMap() {
 
   const handleRevoke = async () => {
     if (!selectedNode) return;
-    await aegisApi.revokeRBAC(selectedNode.id);
+    await manifoldApi.revokeRBAC(selectedNode.id);
     addToast({
       title: `RBAC revoked for "${selectedNode.label}"`,
       description: "All role bindings have been removed.",

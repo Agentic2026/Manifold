@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../auth";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
+import { ManifoldIcon } from "../components/ManifoldIcon";
 
 export function Landing() {
   const { isAuthenticated } = useAuth();
@@ -26,18 +27,18 @@ export function Landing() {
             className="px-4 py-1.5 text-sm rounded-full"
           >
             <span className="mr-2 text-primary">●</span>
-            Hackathon Ready Template
+            Continuous Security Monitoring
           </Badge>
 
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-text leading-tight">
-            Build your next big thing
-            <span className="text-primary block mt-2">in record time.</span>
+            Secure your systems
+            <span className="text-primary block mt-2">with confidence.</span>
           </h1>
 
           <p className="text-xl md:text-2xl text-text-muted max-w-2xl mx-auto leading-relaxed">
-            A secure-by-default starter kit with passkey authentication,
-            device-bound keys, and role-based access control. Focus on shipping,
-            not boilerplate.
+            Manifold provides continuous cybersecurity monitoring with
+            topology visualization, LLM-powered analysis, and role-based
+            access control. Focus on shipping, not firefighting.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -73,7 +74,8 @@ export function Landing() {
 
           <div className="pt-8 text-sm text-text-muted">
             Powered by <span className="font-semibold text-text">FastAPI</span>{" "}
-            and <span className="font-semibold text-text">React</span>
+            and <span className="font-semibold text-text">React</span> ·{" "}
+            <span className="font-semibold text-text">Manifold</span>
           </div>
         </div>
       </section>
@@ -234,9 +236,9 @@ export function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2 font-bold text-lg">
             <div className="p-1.5 bg-primary/10 rounded-lg">
-              <Code2 className="w-5 h-5 text-primary" />
+              <ManifoldIcon className="w-5 h-5 text-primary" />
             </div>
-            <span>{"manifold"}</span>
+            <span>Manifold</span>
           </div>
           <div className="flex gap-8 text-sm text-text-muted">
             <a href="#" className="hover:text-text transition-colors">
@@ -253,7 +255,7 @@ export function Landing() {
             </a>
           </div>
           <div className="text-sm text-text-muted">
-            &copy; {new Date().getFullYear()} {"manifold"}. All rights
+            &copy; {new Date().getFullYear()} Manifold. All rights
             reserved.
           </div>
         </div>

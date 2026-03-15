@@ -196,7 +196,7 @@ export function AIChatPanel() {
               <BrainCircuit className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-text">AEGIS AI</h3>
+              <h3 className="text-xs font-semibold text-text">Manifold AI</h3>
               <p className="text-[9px] text-text-muted">Security Analysis Assistant</p>
             </div>
           </div>
@@ -253,7 +253,7 @@ export function AIChatPanel() {
                 <Sparkles className="w-6 h-6 text-primary" />
               </div>
               <p className="text-sm font-semibold text-text mb-1">
-                AEGIS Security AI
+                Manifold Security AI
               </p>
               <p className="text-xs text-text-muted mb-4 max-w-[240px]">
                 Ask me about threats, vulnerabilities, or get remediation guidance for your system.

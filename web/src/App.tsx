@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router";
-import { AegisLayout } from "./components/AegisLayout";
+import { ManifoldLayout } from "./components/ManifoldLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -16,11 +16,11 @@ export function App() {
       <Route path="/login"           element={<Login />} />
       <Route path="/register"        element={<Register />} />
 
-      {/* Protected AEGIS routes — wrapped in sidebar Layout */}
+      {/* Protected routes — wrapped in sidebar Layout */}
       <Route
         element={
           <ProtectedRoute>
-            <AegisLayout />
+            <ManifoldLayout />
           </ProtectedRoute>
         }
       >

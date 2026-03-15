@@ -1,6 +1,5 @@
 import { Outlet, NavLink } from "react-router";
 import {
-  Shield,
   Network,
   BrainCircuit,
   Bug,
@@ -21,13 +20,14 @@ import {
   subscribeToSystemThemeChanges,
   type ThemePreference,
 } from "../theme";
+import { ManifoldIcon } from "./ManifoldIcon";
 import { cn } from "../lib/utils";
 import { ToastProvider } from "../context/ToastContext";
 import { ToastContainer } from "./Toast";
 import { ChatProvider } from "../context/ChatContext";
 import { AIChatPanel } from "./AIChatPanel";
 import { SecurityGauge } from "./SecurityGauge";
-import { aegisApi } from "../api/aegis";
+import { manifoldApi } from "../api/manifold";
 import { useAuth } from "../auth";
 
 const NAV_ITEMS = [
@@ -70,7 +70,7 @@ function ThemeToggle({
   );
 }
 
-export function AegisLayout() {
+export function ManifoldLayout() {
   const [themePreference, setThemePreference] = useState<ThemePreference>(() =>
     typeof window === "undefined" ? "system" : readThemePreference(),
   );
@@ -93,7 +93,7 @@ export function AegisLayout() {
   // Fetch security score from backend on mount and periodically
   useEffect(() => {
     const fetchScore = () => {
-      aegisApi.getSecurityScore().then(setSecurityScore).catch(() => {
+      manifoldApi.getSecurityScore().then(setSecurityScore).catch(() => {
         // Score fetch may fail when backend is unavailable; silently retry on next interval
       });
     };
@@ -149,13 +149,12 @@ export function AegisLayout() {
         {/* Brand */}
         <div className="flex items-center gap-2.5 px-4 h-14 border-b border-border flex-shrink-0">
           <div className="p-1.5 rounded-lg bg-primary/10">
-            <Shield className="w-5 h-5 text-primary" />
+            <ManifoldIcon className="w-5 h-5 text-primary" />
           </div>
           <div className="leading-none">
             <span className="font-bold text-sm text-text tracking-tight">
-              AEGIS
+              Manifold
             </span>
-            <span className="text-xs text-text-muted ml-1 font-mono">.LLM</span>
           </div>
         </div>
 

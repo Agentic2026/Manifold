@@ -93,7 +93,7 @@ export function AppSettings() {
           {/* Appearance */}
           <Section
             title="Appearance"
-            description="Control how AEGIS.LLM looks across all sessions."
+            description="Control how Manifold looks across all sessions."
           >
             <Field
               label="Theme"
@@ -122,7 +122,7 @@ export function AppSettings() {
           {/* Backend */}
           <Section
             title="Backend Connection"
-            description="Configure how the dashboard connects to the AEGIS API."
+            description="Configure how the dashboard connects to the Manifold API."
           >
             <Field
               label="API Base URL"
@@ -132,7 +132,7 @@ export function AppSettings() {
                 type="url"
                 value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
-                placeholder="https://api.your-aegis.internal"
+                placeholder="https://api.your-manifold.internal"
                 className="w-64 px-3 py-1.5 text-xs bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </Field>

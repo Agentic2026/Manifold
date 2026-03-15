@@ -9,7 +9,6 @@ import {
   Radio,
   Menu,
   X,
-  Code2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -21,6 +20,7 @@ import {
   type ThemePreference,
 } from "../theme";
 import { Button } from "./Button";
+import { ManifoldIcon } from "./ManifoldIcon";
 import { cn } from "../lib/utils";
 
 export function Layout() {
@@ -104,9 +104,9 @@ export function Layout() {
               className="flex items-center gap-2 font-bold text-lg text-text hover:text-primary transition-colors"
             >
               <div className="p-1.5 bg-primary/10 rounded-lg">
-                <Code2 className="w-5 h-5 text-primary" />
+                <ManifoldIcon className="w-5 h-5 text-primary" />
               </div>
-              <span>{"manifold"}</span>
+              <span>Manifold</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -273,7 +273,7 @@ export function Layout() {
       <footer className="border-t border-border py-8 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-text-muted">
           <p>
-            &copy; {new Date().getFullYear()} {"manifold"} Hackathon
+            &copy; {new Date().getFullYear()} Manifold
           </p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-text transition-colors">
