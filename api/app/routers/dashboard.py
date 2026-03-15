@@ -1,10 +1,16 @@
 import json
+import logging
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from h4ckath0n.auth import require_user
 from h4ckath0n.realtime import sse_response, authenticate_sse_request, AuthError
+from app.core.database import get_db_session
+from app.agents.chat import stream_agent_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["dashboard"])
 
@@ -52,15 +58,6 @@ class ChatRequest(BaseModel):
     context: Optional[dict] = None
     thread_id: Optional[str] = None
     history: Optional[list] = None
-
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db_session
-from app.agents.chat import stream_agent_response
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 @router.post("/llm/chat/stream")

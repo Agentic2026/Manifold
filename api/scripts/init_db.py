@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from app.core.database import engine, Base
-from app.models import *  # ensure all models are imported
+from app.models import *  # noqa: F403 — registers all ORM models with Base.metadata for create_all
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

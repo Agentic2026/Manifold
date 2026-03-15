@@ -33,9 +33,9 @@ async def override_get_db_session():
         yield session
 
 
-app.dependency_overrides[get_db_session] = override_get_db_session
+from unittest.mock import patch, AsyncMock  # noqa: E402
 
-from unittest.mock import patch, AsyncMock
+app.dependency_overrides[get_db_session] = override_get_db_session
 
 VALID_TOKEN = "test-secret-123"
 

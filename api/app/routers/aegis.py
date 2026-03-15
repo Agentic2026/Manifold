@@ -728,8 +728,7 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
             await reconcile_topology_from_containers(db)
         _last_reconcile_ts = now
 
-    nodes_q_check = await db.execute(select(DBNode.id).limit(1))
-    # We already fetched nodes check above; now use the shared helper
+    # Use the shared helper for node statuses — also covers the "any nodes?" check
     node_statuses = await _compute_effective_node_statuses(db)
     edges_q = await db.execute(select(DBEdge))
 
@@ -775,7 +774,7 @@ async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
     # Trigger the background LangGraph DAG topology agent.
     # Failures here must not prevent returning the topology graph.
     try:
-        analysis_update = await run_topology_analysis(db)
+        _ = await run_topology_analysis(db)
     except Exception as exc:
         logger.error("Topology analysis failed during scan: %s", exc)
         # Ensure the session is clean for the subsequent topology fetch

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List
 
 from langchain_core.tools import tool
@@ -57,8 +58,6 @@ def _extract_memory_bytes(memory_stats: dict) -> int | None:
 
 
 # ── Structured spike result ─────────────────────────────────
-
-from dataclasses import dataclass, asdict
 
 
 @dataclass
