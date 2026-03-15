@@ -6,7 +6,7 @@
  * bundled below, so the UI works standalone during development.
  */
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api";
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -508,7 +508,7 @@ async function fetchJSON<T>(path: string, fallback: T): Promise<T> {
  */
 async function fetchTopologyLive(): Promise<TopologyData | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/topology`, {
+    const res = await fetch(`${BASE_URL}/topology`, {
       headers: { "Content-Type": "application/json" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -540,7 +540,7 @@ export const aegisApi = {
   /** Trigger a deep scan and return updated topology. */
   runDeepScan: async (): Promise<TopologyData | null> => {
     try {
-      const res = await fetch(`${BASE_URL}/api/topology/scan`, {
+      const res = await fetch(`${BASE_URL}/topology/scan`, {
         method: "POST",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -552,20 +552,20 @@ export const aegisApi = {
 
   /** Get all detected vulnerabilities. */
   getVulnerabilities: () =>
-    fetchJSON<Vulnerability[]>("/api/vulnerabilities", MOCK_VULNERABILITIES),
+    fetchJSON<Vulnerability[]>("/vulnerabilities", MOCK_VULNERABILITIES),
 
   /** Get LLM-generated insights. */
   getInsights: () =>
-    fetchJSON<LLMInsight[]>("/api/insights", MOCK_INSIGHTS),
+    fetchJSON<LLMInsight[]>("/insights", MOCK_INSIGHTS),
 
   /** Get RBAC policies. */
   getRBACPolicies: () =>
-    fetchJSON<RBACPolicy[]>("/api/rbac", MOCK_RBAC),
+    fetchJSON<RBACPolicy[]>("/rbac", MOCK_RBAC),
 
   /** Isolate a node (block all traffic). */
   isolateNode: async (nodeId: string): Promise<{ success: boolean }> => {
     try {
-      const res = await fetch(`${BASE_URL}/api/topology/${nodeId}/isolate`, {
+      const res = await fetch(`${BASE_URL}/topology/${nodeId}/isolate`, {
         method: "POST",
       });
       return (await res.json()) as { success: boolean };
@@ -578,7 +578,7 @@ export const aegisApi = {
   /** Revoke all RBAC roles for a node. */
   revokeRBAC: async (nodeId: string): Promise<{ success: boolean }> => {
     try {
-      const res = await fetch(`${BASE_URL}/api/rbac/${nodeId}/revoke`, {
+      const res = await fetch(`${BASE_URL}/rbac/${nodeId}/revoke`, {
         method: "POST",
       });
       return (await res.json()) as { success: boolean };
@@ -594,7 +594,7 @@ export const aegisApi = {
     breakdown: { label: string; impact: number }[];
   }> => {
     try {
-      const res = await fetch(`${BASE_URL}/api/security-score`, {
+      const res = await fetch(`${BASE_URL}/security-score`, {
         headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

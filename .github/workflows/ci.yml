@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  API_IMAGE: ghcr.io/agentic2026/manifold/api
-  WEB_IMAGE: ghcr.io/agentic2026/manifold/web
+  API_IMAGE: ghcr.io/agentic2026/manifold
+  WEB_IMAGE: ghcr.io/agentic2026/manifold-web
 
 permissions:
   contents: read
@@ -155,9 +155,9 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile
-          target: api
+          context: api
+          file: api/Dockerfile
+          target: runtime
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ env.API_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=api-${{ matrix.platform }}

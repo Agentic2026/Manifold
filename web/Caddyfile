@@ -1,0 +1,52 @@
+# ── Manifold web – Caddyfile ────────────────────────────────
+# Single-origin reverse proxy + static SPA hosting.
+#
+# The web container is the ONLY service that exposes a public
+# port.  All backend traffic is proxied through Caddy on the
+# /api/* prefix (path is preserved for the upstream).
+# ────────────────────────────────────────────────────────────
+
+{
+	admin off
+	auto_https off
+
+	servers {
+		timeouts {
+			read_body   30s
+			read_header 10s
+			write       120s
+			idle        120s
+		}
+	}
+}
+
+:{$WEB_PORT:8080} {
+	log {
+		output stdout
+		format console
+	}
+
+	# ── Backend API proxy (/api/*) ──────────────────────────
+	# Strips /api prefix → backend sees routes at root.
+	handle_path /api/* {
+		reverse_proxy {$BACKEND_URL:api:8000} {
+			# SSE / streaming: flush every write immediately
+			flush_interval -1
+
+			# WebSocket upgrade support is automatic in Caddy v2
+			# Large request bodies (file uploads, compose import)
+			transport http {
+				read_buffer  16384
+				write_buffer 16384
+			}
+		}
+	}
+
+	# ── Frontend SPA ────────────────────────────────────────
+	handle {
+		root * /srv
+		encode gzip zstd
+		try_files {path} /index.html
+		file_server
+	}
+}

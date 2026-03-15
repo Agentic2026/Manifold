@@ -1,229 +1,151 @@
 # Manifold: Current State Assessment and Production-Readiness Plan
 
-_Last updated: 2026-03-14_
+_Last updated: 2026-03-15_
 
 This document is a practical readiness assessment of the **current repository state** and a roadmap to reach a production-grade platform.
 
 ## 1) Executive Summary
 
-Manifold has a strong prototype foundation:
-- A running FastAPI backend with telemetry ingestion and AEGIS-style endpoints.
-- A modern React + TypeScript frontend with unit tests.
-- Passing backend and frontend unit tests in local CI-like execution.
+Manifold has a strong prototype foundation with recent hardening:
+- A running FastAPI backend with telemetry ingestion, runtime topology discovery, and AEGIS-style endpoints.
+- A modern React + TypeScript frontend with unit, lint, typecheck, and E2E tests all passing.
+- Docker packaging uses pre-built GHCR images and a single-port Caddy reverse proxy.
+- A real release workflow (multi-arch, SBOM, Trivy scanning) is in place.
 
-However, the codebase is **not production-ready yet**. Key blockers include:
-- Minimal backend runtime configuration and secret management.
-- Prototype/demo endpoints and seeding flows mixed with production routes.
-- No explicit migration system, SLOs, or observability standards documented.
-- Frontend lint currently failing on one React hook anti-pattern.
-- Missing explicit release, rollback, and operational runbooks.
+The codebase is in **active transition toward production**. Key remaining work:
+- Alembic migration lifecycle.
+- Expanded secret management and environment profiles.
+- Observability (structured logging, OpenTelemetry).
+- Progressive delivery strategy.
 
 ## 2) Current State (Grounded in the Repository)
 
 ### Backend state
-- Backend uses FastAPI via `h4ckath0n.create_app()` and includes CSP middleware plus routers.
-- Healthcheck and demo endpoints (`/demo/ping`, `/demo/echo`, `/demo/ws`, `/demo/sse`) are active in the same app surface.
+- Backend uses FastAPI via `h4ckath0n.create_app()` with CSP middleware plus routers.
+- Healthcheck and demo endpoints (`/demo/ping`, `/demo/echo`, `/demo/ws`, `/demo/sse`) are active (demo/prototype, not production-hardened).
 - Telemetry ingestion endpoint (`POST /cadvisor/batch`) validates bearer token and writes to PostgreSQL using bulk inserts/upserts.
-- **Runtime topology auto-discovery** from live container metadata is implemented — topology nodes are created automatically from ingested cAdvisor data using `com.docker.compose.service` and `com.docker.compose.project` labels.
-- Configuration currently exposes a very small `Settings` surface (database URL + cAdvisor token).
-- ORM models and services support machine/container/snapshot ingest, runtime discovery, and basic topology/vulnerability/insight access.
+- **Runtime topology auto-discovery** from live container metadata is the primary mode — topology nodes are created automatically from ingested cAdvisor data using `com.docker.compose.service` and `com.docker.compose.project` labels.
+- **Topology node IDs are project-scoped** (`<project>__<service>`) to prevent collisions across different Compose stacks.
+- **Import is non-destructive** — `POST /topology/import` merges/enriches existing topology (upsert) rather than replacing it. An optional `project_name` parameter scopes imported nodes to align with runtime-discovered containers.
+- **Inferred edges are labeled honestly** — edges from runtime discovery are marked as `kind: "inferred"` with evidence labels (e.g., "inferred: same project (myapp)", "inferred: shared network (frontend)").
+- **Isolate and revoke endpoints are honestly simulated** — they persist node status changes but do not perform real network isolation or credential revocation. Responses include `"simulated": true`.
 
 ### Frontend state
-- React/Vite/TypeScript stack is in place with component and page tests.
-- API client scaffolding and auth modules exist.
+- React/Vite/TypeScript stack with component and page tests.
+- API client uses `/api` base URL for all requests (proxied through Caddy in production, Vite dev server in development).
 - System Map shows live/empty/offline state indicators and refreshes automatically.
-- Security score uses backend `/api/security-score` as the source of truth.
 - All lint, typecheck, and unit tests pass.
 
+### Packaging state
+- **Single-port deployment**: Only the Caddy web container exposes port 8080.
+- **Image-based compose**: `docker-compose.yml` uses GHCR images by default (`ghcr.io/agentic2026/manifold`, `ghcr.io/agentic2026/manifold-web`).
+- **Caddy reverse proxy**: Replaces nginx. Handles `/api/*` → backend, serves SPA, supports WebSocket and SSE.
+- **Multi-stage Dockerfiles**: `api/Dockerfile` (builder/runtime stages, non-root user), `web/Dockerfile` (Caddy-based).
+- **Release workflow**: Multi-arch builds, OCI labels, SBOM, provenance, Trivy scanning.
+
 ### Tests/checks state
-- `api`: pytest suite passes (18 tests including runtime discovery).
+- `api`: pytest suite passes (19 tests including runtime discovery, project-scoped IDs, import coexistence).
 - `web`: vitest suite passes (37 tests), typecheck passes, eslint passes.
+- `e2e`: Playwright suite passes (17 tests).
 
 ### Onboarding model
-- **Primary flow:** User adds Manifold monitoring service to their existing Docker Compose stack → cAdvisor pushes telemetry → Manifold auto-discovers topology.
-- **Optional flow:** Manual Docker Compose import (`POST /api/topology/import`) for enrichment/preview.
+- **Primary flow:** Operator adds cAdvisor overlay to their Compose stack → cAdvisor pushes telemetry through `http://<manifold>:8080/api/cadvisor/batch` → Manifold auto-discovers topology.
+- **Optional flow:** Manual Compose import (`POST /api/topology/import`) for enrichment/preview. Non-destructive merge.
 
 ## 3) Production-Readiness Gap Analysis
 
 ### A. Architecture & Service Boundaries
-**Observed:** Demo and production behaviors are coupled in one app.
+**Status:** Demo and production behaviors are coupled in one app.
 
-**Gaps:**
+**Remaining gaps:**
 - No environment-gated feature separation for demo routes and seed endpoints.
-- No clear bounded contexts between ingestion, analysis, and control-plane actions.
+- Isolate/revoke actions are simulated, not connected to real container runtime.
 
 **Target state:**
-- Explicit app modules: `core_api`, `ingestion_api`, `analysis_api`, `demo_api` (disabled by default in production).
+- Explicit app modules with environment gating.
+- Real container isolation via Docker API integration (future).
 
 ### B. Configuration, Secrets, and Environment Strategy
-**Observed:** `Settings` only contains two environment variables.
+**Status:** `Settings` contains core environment variables. `.env.example` documents all variables.
 
-**Gaps:**
-- No standardized settings for auth, CORS origins, logging levels, rate limits, DB pool sizing, LLM/provider selection, Redis, storage, etc.
-- No secret source strategy (vault/KMS/secrets manager).
-
-**Target state:**
-- Typed, validated settings with environment profiles (`local`, `staging`, `prod`) and secret-backed deployment.
+**Remaining gaps:**
+- No secret source strategy (vault/KMS/secrets manager) for production.
+- No environment profiles (`local`, `staging`, `prod`).
 
 ### C. Data Layer and Migrations
-**Observed:** Table creation happens in endpoint-level seed flow; no visible migration toolchain in repo docs.
+**Status:** Table creation on startup; no Alembic migration lifecycle.
 
-**Gaps:**
-- No Alembic migration lifecycle documented/enforced.
+**Remaining gaps:**
 - No schema drift policy or backward-compatible migration rules.
 
-**Target state:**
-- Alembic migrations with CI checks for migration consistency and rollback safety.
+### D. API Security
+**Status:** Ingestion token auth exists; WebAuthn auth exists.
 
-### D. API Security and Zero-Trust Controls
-**Observed:** Ingestion token auth exists; auth extensions and JWT flows exist.
+**Remaining gaps:**
+- No rate limiting on sensitive endpoints.
+- No formal threat model documentation.
 
-**Gaps:**
-- Missing documented threat model and token rotation policy.
-- No explicit tenant isolation and per-endpoint authorization matrix.
-- No formal API rate limiting and abuse controls documented.
+### E. Observability
+**Status:** Basic health endpoint.
 
-**Target state:**
-- Endpoint-by-endpoint authZ policy, key rotation SLAs, mandatory audit trails, and WAF/rate limits.
+**Remaining gaps:**
+- No structured logging, tracing, or metrics export.
+- No dashboards or alerting.
 
-### E. Reliability, Scaling, and Performance
-**Observed:** Bulk insert ingestion implementation is a good base.
+### F. Delivery & Supply Chain
+**Status:** Release workflow with SBOM, provenance, and Trivy scanning is in place.
 
-**Gaps:**
-- No declared SLOs/SLIs for ingest latency, query p95, API error rate.
-- No queue/backpressure strategy documented for burst telemetry loads.
-- No capacity planning or load test baselines.
+**Completed:**
+- [x] Multi-arch Docker image builds.
+- [x] GHCR image publishing.
+- [x] Trivy vulnerability scanning.
+- [x] SBOM and provenance generation.
+- [x] Release process documentation.
 
-**Target state:**
-- Defined SLOs, autoscaling policy, and repeatable load test thresholds.
+**Remaining gaps:**
+- No signed artifacts (cosign).
+- No progressive delivery (canary/blue-green).
 
-### F. Observability and Operations
-**Observed:** Basic health endpoint exists.
+## 4) Production Plan (Phased)
 
-**Gaps:**
-- No standardized structured logging, tracing, metrics export, alerting docs.
-- No on-call/runbook/incident management process.
+## Phase 0 — Stabilize Baseline ✅ (Completed)
+1. ~~Fix frontend lint error and enforce lint as mandatory gate.~~ All quality gates pass.
+2. ~~Runtime topology auto-discovery implemented.~~ Project-scoped IDs prevent collisions.
+3. ~~Import is non-destructive.~~ Merges with runtime topology.
+4. ~~Single-port Caddy deployment.~~ Image-based compose with GHCR defaults.
 
-**Target state:**
-- OpenTelemetry-based traces/metrics, dashboard + alerts, incident playbooks.
-
-### G. Frontend Production Hardening
-**Observed:** Tests pass; lint passes.
-
-**Gaps:**
-- No explicit web performance budgets, error tracking, or accessibility budget.
-
-**Target state:**
-- Green quality gates, RUM + error telemetry, accessibility and bundle-size budgets.
-
-### H. Delivery, Environments, and Governance
-**Observed:** Docker + compose exists.
-
-**Gaps:**
-- No documented progressive delivery strategy (canary/blue-green).
-- No signed artifacts / SBOM / supply-chain scanning workflow documented.
-- No formal release checklist and rollback process.
-
-**Target state:**
-- CI/CD with security scans, artifact provenance, release gates, rollback automation.
-
-## 4) Production Plan (Phased, Comprehensive)
-
-## Phase 0 — Stabilize Baseline (Week 1)
-1. Fix frontend lint error and enforce lint as mandatory gate.
-2. Add a concise architecture decision record (ADR) index.
-3. Split demo routes behind an explicit `ENABLE_DEMO_ROUTES` setting.
-4. Freeze API contract versioning approach (OpenAPI + generated client policy).
-
-**Exit criteria:** backend tests pass, frontend lint/type/test/build all pass, no demo endpoints exposed in prod profile.
-
-## Phase 1 — Secure Foundations (Weeks 2–3)
+## Phase 1 — Secure Foundations (Next)
 1. Expand `Settings` to include all runtime/security/ops knobs.
-2. Add secret handling policy (env for local, secret manager for staging/prod).
-3. Document and enforce authN/authZ matrix per route.
-4. Introduce rate limiting and request size guards on sensitive routes.
-5. Add audit logging schema for security-sensitive actions.
+2. Add secret handling policy for staging/production.
+3. Add rate limiting on sensitive endpoints.
+4. Split demo routes behind `ENABLE_DEMO_ROUTES` setting.
 
-**Exit criteria:** security review complete, config matrix documented, auth coverage tests added.
-
-## Phase 2 — Data & Platform Reliability (Weeks 3–5)
+## Phase 2 — Data & Platform Reliability
 1. Introduce Alembic migrations and migration CI checks.
 2. Add ingestion load tests and p95/p99 latency tracking.
-3. Implement DB index review + retention/partition strategy for telemetry tables.
-4. Add idempotency/duplicate prevention strategy for telemetry snapshots.
+3. Implement retention/partition strategy for telemetry tables.
 
-**Exit criteria:** migrations required for schema changes, load benchmark baseline recorded, retention policy enabled.
+## Phase 3 — Observability & Incident Readiness
+1. Structured JSON logs with request correlation IDs.
+2. OpenTelemetry traces + metrics.
+3. Dashboards and alerts.
 
-## Phase 3 — Observability & Incident Readiness (Weeks 5–6)
-1. Implement structured JSON logs with request correlation IDs.
-2. Add OpenTelemetry traces + metrics for API/DB/LLM/tool calls.
-3. Stand up dashboards and alerts aligned to SLOs.
-4. Write runbooks: ingest degradation, DB saturation, auth outage, LLM provider failure.
+## Phase 4 — Delivery & Compliance Hardening
+1. Artifact signing (cosign).
+2. Progressive delivery strategy.
+3. Chaos/fault-injection testing.
 
-**Exit criteria:** synthetic checks and alerts active in staging; runbooks tested in a game day.
-
-## Phase 4 — Delivery & Compliance Hardening (Weeks 6–8)
-1. Add CI/CD promotion flow: dev → staging → production with approval gates.
-2. Add SAST, dependency scanning, container scanning, SBOM generation.
-3. Add artifact signing/provenance and rollback automation.
-4. Run pre-production chaos and fault-injection drills.
-
-**Exit criteria:** signed deploy artifacts, green security scans, rehearsed rollback under SLA.
-
-## Phase 5 — Production Launch Readiness (Weeks 8+)
-1. Final launch review against checklist (below).
-2. Execute staged rollout (internal → pilot tenants → GA).
-3. Hold post-launch reliability and security retrospective.
-
-**Exit criteria:** 2–4 weeks stable operation with SLO compliance.
-
-## 5) Production Readiness Checklist (Go/No-Go)
-
-### Security
-- [ ] Threat model reviewed and approved.
-- [ ] Secrets centrally managed and rotated.
-- [ ] Endpoint authZ matrix tested.
-- [ ] Audit logging enabled for privileged actions.
-
-### Reliability
-- [ ] SLOs and error budgets defined.
-- [ ] Load tests at expected peak + surge.
-- [ ] Runbooks exist for top incident classes.
-- [ ] On-call ownership defined.
-
-### Data
-- [ ] Alembic migration workflow enforced.
-- [ ] Backup + restore drill passed.
-- [ ] Retention and PII policies implemented.
-
-### Delivery
-- [ ] CI gates green (lint/type/tests/build/security scans).
-- [ ] Staging parity validated.
-- [ ] Rollback tested.
-
-### Product/UX
-- [ ] Accessibility checks passed.
-- [ ] Error boundaries and telemetry verified.
-- [ ] Documentation up to date for operators and developers.
-
-## 6) Suggested Ownership Model
-- **Platform/Infra:** CI/CD, environments, observability, rollout safety.
-- **Backend:** ingestion reliability, schema/migrations, authN/authZ enforcement.
-- **Frontend:** UX reliability, accessibility, quality gates.
-- **Security:** threat modeling, controls validation, incident readiness.
-- **Product/Eng:** launch criteria and prioritization governance.
-
-## 7) Immediate Next 10 Actions
-1. Fix `SecurityGauge` lint violation and re-run `npm run check`.
-2. Add expanded `Settings` with explicit defaults and required secrets.
-3. Add `ENABLE_DEMO_ROUTES` and `ENABLE_SEED_ENDPOINTS` flags.
-4. Add Alembic and initial migration from current schema.
-5. Add route-level auth tests for all privileged endpoints.
-6. Add rate limiting to ingest + chat endpoints.
-7. Add structured logging middleware with request IDs.
-8. Add OpenTelemetry instrumentation for FastAPI + SQLAlchemy.
-9. Define SLOs and create baseline dashboards/alerts.
-10. Create release checklist + rollback runbook in `/docs/operations`.
+## 5) Immediate Next Actions
+1. Add expanded `Settings` with explicit defaults and required secrets.
+2. Add `ENABLE_DEMO_ROUTES` and `ENABLE_SEED_ENDPOINTS` flags.
+3. Add Alembic and initial migration from current schema.
+4. Add route-level auth tests for all privileged endpoints.
+5. Add rate limiting to ingest + chat endpoints.
+6. Add structured logging middleware with request IDs.
+7. Add OpenTelemetry instrumentation for FastAPI + SQLAlchemy.
+8. Implement real container isolation via Docker API (replace simulated isolate).
+9. Add artifact signing to release workflow.
+10. Create operational runbooks in `/docs/operations`.
 
 ---
 

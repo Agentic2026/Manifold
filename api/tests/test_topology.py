@@ -68,7 +68,10 @@ SAMPLE_BATCH_WITH_NET = {
             "container_reference": {"name": "/manifold-api-1", "aliases": ["api"], "namespace": "docker"},
             "container_spec": {
                 "image": "manifold-api:latest",
-                "labels": {"com.docker.compose.service": "api"},
+                "labels": {
+                    "com.docker.compose.service": "api",
+                    "com.docker.compose.project": "manifold",
+                },
             },
             "stats": {
                 "timestamp": "2024-01-15T12:34:56Z",
@@ -103,12 +106,12 @@ async def test_topology_seed_and_fetch():
     with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             # Seed the DB
-            response = await ac.post("/api/topology/seed")
+            response = await ac.post("/topology/seed")
             assert response.status_code == 200
             assert response.json() in [{"status": "seeded"}, {"status": "already_seeded"}]
 
             # Fetch the topology
-            topo_resp = await ac.get("/api/topology")
+            topo_resp = await ac.get("/topology")
             assert topo_resp.status_code == 200
             topo_data = topo_resp.json()
 
@@ -116,7 +119,7 @@ async def test_topology_seed_and_fetch():
             assert len(topo_data["edges"]) > 0
 
             # Run a scan to invoke LangGraph agent
-            scan_resp = await ac.post("/api/topology/scan")
+            scan_resp = await ac.post("/topology/scan")
             assert scan_resp.status_code == 200
             scan_data = scan_resp.json()
             assert scan_data["scanStatus"] == "complete"
@@ -132,7 +135,7 @@ async def test_topology_import():
     await _reset_tables()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        resp = await ac.post("/api/topology/import", json={"yaml_content": SMALL_COMPOSE})
+        resp = await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "imported"
@@ -142,7 +145,7 @@ async def test_topology_import():
         assert body["edges"] >= 2
 
         # Verify the topology endpoint returns them
-        topo = await ac.get("/api/topology")
+        topo = await ac.get("/topology")
         assert topo.status_code == 200
         data = topo.json()
         node_ids = {n["id"] for n in data["nodes"]}
@@ -187,13 +190,13 @@ async def test_container_to_node_correlation():
             )
             assert resp.status_code == 202
 
-    # Verify the container record has topology_node_id == "api"
+    # Verify the container record has project-scoped topology_node_id
     from app.models.telemetry import Container
     from sqlalchemy import select
     async with TestSessionLocal() as session:
         result = await session.execute(select(Container).where(Container.reference_name == "/manifold-api-1"))
         container = result.scalar_one()
-        assert container.topology_node_id == "api"
+        assert container.topology_node_id == "manifold__api"
 
 
 # ────────────────────────────────────────────────────────────
@@ -234,7 +237,7 @@ async def test_topology_real_telemetry():
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             # Import topology first
-            await ac.post("/api/topology/import", json={"yaml_content": SMALL_COMPOSE})
+            await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
 
             # Ingest container data matching "api" node
             resp = await ac.post(
@@ -245,7 +248,7 @@ async def test_topology_real_telemetry():
             assert resp.status_code == 202
 
             # Fetch topology
-            topo = await ac.get("/api/topology")
+            topo = await ac.get("/topology")
             assert topo.status_code == 200
             data = topo.json()
 
@@ -386,12 +389,12 @@ async def test_runtime_discovery_creates_topology_nodes():
             assert resp.status_code == 202
 
             # GET /api/topology should return auto-discovered nodes
-            topo = await ac.get("/api/topology")
+            topo = await ac.get("/topology")
             assert topo.status_code == 200
             data = topo.json()
 
             node_ids = {n["id"] for n in data["nodes"]}
-            assert {"web", "api", "db"} == node_ids
+            assert {"myapp__web", "myapp__api", "myapp__db"} == node_ids
 
             # Edges should exist between services in the same project
             assert len(data["edges"]) >= 1
@@ -419,17 +422,17 @@ async def test_runtime_discovery_topology_has_telemetry():
             )
             assert resp.status_code == 202
 
-            topo = await ac.get("/api/topology")
+            topo = await ac.get("/topology")
             data = topo.json()
 
             # "web" has network stats → should have telemetry
-            web_node = next((n for n in data["nodes"] if n["id"] == "web"), None)
+            web_node = next((n for n in data["nodes"] if n["id"] == "myapp__web"), None)
             assert web_node is not None
             assert web_node["telemetry"] is not None
             assert web_node["telemetry"]["ingressMbps"] >= 0
 
             # "db" has no network stats → telemetry may be None or have zero throughput
-            db_node = next((n for n in data["nodes"] if n["id"] == "db"), None)
+            db_node = next((n for n in data["nodes"] if n["id"] == "myapp__db"), None)
             assert db_node is not None
 
 
@@ -454,28 +457,33 @@ async def test_runtime_discovery_stable_across_ingests():
                 )
                 assert resp.status_code == 202
 
-            topo = await ac.get("/api/topology")
+            topo = await ac.get("/topology")
             data = topo.json()
 
             # Should still be exactly 3 unique nodes
             node_ids = [n["id"] for n in data["nodes"]]
             assert len(node_ids) == 3
-            assert set(node_ids) == {"web", "api", "db"}
+            assert set(node_ids) == {"myapp__web", "myapp__api", "myapp__db"}
 
 
 @pytest.mark.asyncio
 async def test_runtime_discovery_coexists_with_import():
-    """Imported topology and runtime-discovered topology should coexist."""
+    """Imported topology and runtime-discovered topology should coexist.
+
+    Import without project_name creates unscoped nodes (web, api, db, redis).
+    Runtime discovery creates project-scoped nodes (proj__api).
+    Both coexist — import enriches, runtime discovers.
+    """
     await _reset_tables()
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            # Import topology first (creates web, api, db, redis)
-            await ac.post("/api/topology/import", json={"yaml_content": SMALL_COMPOSE})
+            # Import topology first (creates web, api, db, redis — unscoped)
+            await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
 
-            # Ingest a container matching "api" from runtime
+            # Ingest a container "api" from project "proj" — creates proj__api
             single_batch = {
                 "schema_version": "1",
                 "sent_at": now_iso,
@@ -505,25 +513,71 @@ async def test_runtime_discovery_coexists_with_import():
             )
             assert resp.status_code == 202
 
-            # Topology should have the imported nodes (web, api, db, redis)
-            topo = await ac.get("/api/topology")
+            # Topology should have both imported and runtime-discovered nodes
+            topo = await ac.get("/topology")
             data = topo.json()
             node_ids = {n["id"] for n in data["nodes"]}
+            # Imported (unscoped): web, api, db, redis
+            # Runtime (scoped): proj__api
             assert {"web", "api", "db", "redis"}.issubset(node_ids)
+            assert "proj__api" in node_ids
 
-            # The "api" node should have telemetry from the ingested container
-            api_node = next((n for n in data["nodes"] if n["id"] == "api"), None)
+            # The scoped node should have telemetry
+            api_node = next((n for n in data["nodes"] if n["id"] == "proj__api"), None)
             assert api_node is not None
             assert api_node["telemetry"] is not None
 
 
 @pytest.mark.asyncio
+async def test_import_with_project_name_merges_with_runtime():
+    """Import with project_name should merge with runtime-discovered nodes."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Runtime discovery first — creates myapp__web, myapp__api, myapp__db
+            batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
+            for s in batch["samples"]:
+                s["stats"]["timestamp"] = now_iso
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+
+            # Import with matching project_name → should merge
+            await ac.post("/topology/import", json={
+                "yaml_content": SMALL_COMPOSE,
+                "project_name": "myapp",
+            })
+
+            topo = await ac.get("/topology")
+            data = topo.json()
+            node_ids = {n["id"] for n in data["nodes"]}
+
+            # Runtime nodes should still exist with scoped IDs
+            assert "myapp__web" in node_ids
+            assert "myapp__api" in node_ids
+            assert "myapp__db" in node_ids
+
+            # Import also adds myapp__redis (scoped by project_name)
+            assert "myapp__redis" in node_ids
+
+            # Check that import enriched descriptions
+            api_node = next((n for n in data["nodes"] if n["id"] == "myapp__api"), None)
+            assert api_node is not None
+            assert "Imported from project: myapp" in (api_node.get("description") or "")
+
+
+@pytest.mark.asyncio
 async def test_get_topology_empty_when_no_data():
-    """GET /api/topology returns an empty graph when no containers have been ingested."""
+    """GET /topology returns an empty graph when no containers have been ingested."""
     await _reset_tables()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        topo = await ac.get("/api/topology")
+        topo = await ac.get("/topology")
         assert topo.status_code == 200
         data = topo.json()
         assert data["nodes"] == []
@@ -549,12 +603,12 @@ async def test_edge_generation_inferred_label():
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
 
-            topo = await ac.get("/api/topology")
+            topo = await ac.get("/topology")
             data = topo.json()
 
             for edge in data["edges"]:
                 assert edge["kind"] == "inferred"
-                assert "same project" in edge["label"]
+                assert "inferred:" in edge["label"]
 
 
 @pytest.mark.asyncio
@@ -563,7 +617,7 @@ async def test_security_score_endpoint():
     await _reset_tables()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        resp = await ac.get("/api/security-score")
+        resp = await ac.get("/security-score")
         assert resp.status_code == 200
         data = resp.json()
         assert "score" in data

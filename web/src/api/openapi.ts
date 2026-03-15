@@ -24,7 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/insights": {
+    "/insights": {
         parameters: {
             query?: never;
             header?: never;
@@ -41,7 +41,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/rbac": {
+    "/rbac": {
         parameters: {
             query?: never;
             header?: never;
@@ -58,7 +58,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/rbac/{node_id}/revoke": {
+    "/rbac/{node_id}/revoke": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,7 +75,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/topology": {
+    "/topology": {
         parameters: {
             query?: never;
             header?: never;
@@ -92,7 +92,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/topology/scan": {
+    "/topology/scan": {
         parameters: {
             query?: never;
             header?: never;
@@ -109,7 +109,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/topology/{node_id}/isolate": {
+    "/topology/{node_id}/isolate": {
         parameters: {
             query?: never;
             header?: never;
@@ -126,7 +126,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/vulnerabilities": {
+    "/vulnerabilities": {
         parameters: {
             query?: never;
             header?: never;

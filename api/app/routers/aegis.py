@@ -14,7 +14,7 @@ from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
 from app.services.discovery import reconcile_topology_from_containers
 
-router = APIRouter(prefix="/api", tags=["aegis"])
+router = APIRouter(tags=["aegis"])
 
 # Throttle lazy topology reconciliation to at most once every 30 seconds
 _last_reconcile_ts: float = 0.0
@@ -210,10 +210,17 @@ _EGRESS_WARNING_MBPS = 50.0
 class ComposeImportRequest(BaseModel):
     """Accepts raw Docker Compose YAML for topology import."""
     yaml_content: str
+    project_name: Optional[str] = None
 
 
-def _parse_compose_to_topology(compose_text: str) -> tuple[list[dict], list[dict]]:
+def _parse_compose_to_topology(
+    compose_text: str,
+    project_name: str | None = None,
+) -> tuple[list[dict], list[dict]]:
     """Parse a Docker Compose YAML string into topology node/edge dicts.
+
+    When *project_name* is provided, node IDs are scoped as
+    ``<project_name>__<service>`` to match runtime-discovered IDs.
 
     Returns (nodes, edges) where each element is a dict suitable for
     constructing ``TopologyNode`` / ``TopologyEdge`` ORM objects.
@@ -229,6 +236,11 @@ def _parse_compose_to_topology(compose_text: str) -> tuple[list[dict], list[dict
     nodes: list[dict] = []
     edges: list[dict] = []
     seen_edges: set[str] = set()
+
+    def _scope_id(svc_name: str) -> str:
+        if project_name:
+            return f"{project_name}__{svc_name}"
+        return svc_name
 
     # Service-type heuristics
     def _guess_type(name: str, svc: dict) -> str:
@@ -258,55 +270,57 @@ def _parse_compose_to_topology(compose_text: str) -> tuple[list[dict], list[dict
         if ports:
             ports_desc = f"  Ports: {', '.join(str(p) for p in ports)}"
 
+        scoped = _scope_id(svc_name)
+        source_label = f"project: {project_name}" if project_name else "Docker Compose"
         nodes.append({
-            "id": svc_name,
+            "id": scoped,
             "label": svc_name,
             "service_id": svc_name,
             "status": "healthy",
             "type": _guess_type(svc_name, svc),
             "position": {"x": 60 + col * COL_WIDTH, "y": 60 + row * ROW_HEIGHT},
-            "description": f"Imported from Docker Compose.{ports_desc}",
+            "description": f"Imported from {source_label}.{ports_desc}",
         })
 
-        # Edges from depends_on
+        # Edges from depends_on — labeled as declared
         depends = svc.get("depends_on") or []
         if isinstance(depends, dict):
             depends = list(depends.keys())
         for dep in depends:
-            edge_id = f"e-{svc_name}-{dep}"
+            edge_id = f"declared-{_scope_id(svc_name)}-{_scope_id(dep)}"
             if edge_id not in seen_edges and dep in services:
                 edges.append({
                     "id": edge_id,
-                    "source_id": svc_name,
-                    "target_id": dep,
-                    "kind": "network",
-                    "label": f"depends_on",
+                    "source_id": _scope_id(svc_name),
+                    "target_id": _scope_id(dep),
+                    "kind": "declared",
+                    "label": "declared: depends_on",
                     "animated": False,
                 })
                 seen_edges.add(edge_id)
 
-    # Edges from shared networks
+    # Edges from shared networks — labeled with network name
     network_members: dict[str, list[str]] = {}
     for svc_name, svc in services.items():
         nets = svc.get("networks")
         if isinstance(nets, list):
             for n in nets:
-                network_members.setdefault(n, []).append(svc_name)
+                network_members.setdefault(n, []).append(_scope_id(svc_name))
         elif isinstance(nets, dict):
             for n in nets:
-                network_members.setdefault(n, []).append(svc_name)
+                network_members.setdefault(n, []).append(_scope_id(svc_name))
 
     for net_name, members in network_members.items():
         for i, a in enumerate(members):
             for b in members[i + 1:]:
-                edge_id = f"e-net-{net_name}-{a}-{b}"
+                edge_id = f"declared-net-{net_name}-{a}-{b}"
                 if edge_id not in seen_edges:
                     edges.append({
                         "id": edge_id,
                         "source_id": a,
                         "target_id": b,
-                        "kind": "network",
-                        "label": f"network:{net_name}",
+                        "kind": "declared",
+                        "label": f"declared: shared network ({net_name})",
                         "animated": False,
                     })
                     seen_edges.add(edge_id)
@@ -510,27 +524,41 @@ async def import_topology(
     body: ComposeImportRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    """(Optional) Import topology from a Docker Compose YAML document.
+    """Import topology from a Docker Compose YAML document.
 
-    This endpoint is **not required** for normal operation.  Manifold
-    auto-discovers topology from live cAdvisor runtime metadata.  Use
-    this endpoint only as a fallback, enrichment tool, or for
-    previewing topology before containers are running.
+    This endpoint **merges** (upserts) imported topology with any
+    existing runtime-discovered nodes.  It enriches the graph with
+    declared edges (``depends_on``, shared networks) and descriptions
+    from the Compose file without destroying live data.
 
-    Parses services, depends_on, and shared networks to create topology
-    nodes and edges.  Existing nodes/edges are replaced so each import
-    is idempotent.
+    Pass ``project_name`` to scope node IDs so they align with
+    runtime-discovered containers from the same Compose project.
     """
-    node_dicts, edge_dicts = _parse_compose_to_topology(body.yaml_content)
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-    # Clear existing topology (idempotent import)
-    await db.execute(delete(DBEdge))
-    await db.execute(delete(DBNode))
+    node_dicts, edge_dicts = _parse_compose_to_topology(
+        body.yaml_content, body.project_name
+    )
 
+    # Upsert nodes — merge with existing runtime-discovered nodes
     for nd in node_dicts:
-        db.add(DBNode(**nd))
+        stmt = pg_insert(DBNode).values(**nd).on_conflict_do_update(
+            index_elements=["id"],
+            set_={
+                "description": nd.get("description"),
+                "type": nd.get("type"),
+                # Preserve existing status and position from runtime
+            },
+        )
+        await db.execute(stmt)
+
+    # Upsert edges — add declared edges without removing inferred ones
     for ed in edge_dicts:
-        db.add(DBEdge(**ed))
+        stmt = pg_insert(DBEdge).values(**ed).on_conflict_do_nothing(
+            index_elements=["id"],
+        )
+        await db.execute(stmt)
+
     await db.commit()
 
     return {
@@ -599,7 +627,27 @@ async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
 
 @router.post("/topology/{node_id}/isolate")
 async def isolate_node(node_id: str, db: AsyncSession = Depends(get_db_session)) -> dict:
-    return {"success": True, "nodeId": node_id, "action": "isolated"}
+    """Soft-isolate a node (simulated).
+
+    Persists an "isolated" status on the node so the state is visible
+    in the topology graph.  This is a **simulated** action — no real
+    network isolation is performed.  A production implementation would
+    integrate with the container runtime or firewall.
+    """
+    result = await db.execute(select(DBNode).where(DBNode.id == node_id))
+    node = result.scalar_one_or_none()
+    if node is None:
+        return {
+            "success": False, "nodeId": node_id, "action": "isolate",
+            "simulated": True, "detail": "Node not found",
+        }
+    node.status = "isolated"
+    await db.commit()
+    return {
+        "success": True, "nodeId": node_id, "action": "isolate",
+        "simulated": True,
+        "detail": "Node status set to isolated (simulated — no real network isolation)",
+    }
 
 
 @router.get("/vulnerabilities", response_model=List[Vulnerability])
@@ -638,7 +686,26 @@ async def get_rbac(db: AsyncSession = Depends(get_db_session)) -> List[RBACPolic
 
 @router.post("/rbac/{node_id}/revoke")
 async def revoke_rbac(node_id: str, db: AsyncSession = Depends(get_db_session)) -> dict:
-    return {"success": True, "nodeId": node_id, "action": "rbac_revoked"}
+    """Revoke RBAC policies for a node (simulated).
+
+    Sets the node status to "compromised" to reflect the revocation in
+    the topology graph.  This is a **simulated** action — no real
+    credential revocation is performed.
+    """
+    result = await db.execute(select(DBNode).where(DBNode.id == node_id))
+    node = result.scalar_one_or_none()
+    if node is None:
+        return {
+            "success": False, "nodeId": node_id, "action": "rbac_revoke",
+            "simulated": True, "detail": "Node not found",
+        }
+    node.status = "compromised"
+    await db.commit()
+    return {
+        "success": True, "nodeId": node_id, "action": "rbac_revoke",
+        "simulated": True,
+        "detail": "Node status set to compromised, RBAC revoked (simulated)",
+    }
 
 
 @router.get("/security-score", response_model=SecurityScore)

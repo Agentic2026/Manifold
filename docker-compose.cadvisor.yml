@@ -1,14 +1,18 @@
 # Manifold cAdvisor Drop-in Overlay
 # ──────────────────────────────────
 # Add this to any Docker Compose environment to start pushing container
-# telemetry to a Manifold backend.
+# telemetry to a remote Manifold instance.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.cadvisor.yml up -d
 #
 # Required env vars (set in .env or shell):
-#   MANIFOLD_API_URL   – e.g. http://manifold-api:8000/cadvisor/batch
+#   MANIFOLD_URL   – public Manifold origin, e.g. http://manifold.example.com:8080
 #   MANIFOLD_API_TOKEN – bearer token matching the backend's CADVISOR_METRICS_API_TOKEN
+#
+# The cadvisor container sends metrics through the Manifold web proxy at
+# /api/cadvisor/batch.  Caddy strips the /api prefix → backend receives
+# /cadvisor/batch.
 #
 # On Linux, host.docker.internal is resolved via extra_hosts below.
 # On Docker Desktop (macOS/Windows) the hostname works out of the box.
@@ -21,7 +25,7 @@ services:
       - --storage_driver_buffer_duration=15s
       - --housekeeping_interval=15s
     environment:
-      CADVISOR_METRICS_API_URL: ${MANIFOLD_API_URL:-http://host.docker.internal:8000/cadvisor/batch}
+      CADVISOR_METRICS_API_URL: ${MANIFOLD_URL:-http://host.docker.internal:8080}/api/cadvisor/batch
       CADVISOR_METRICS_API_TOKEN: ${MANIFOLD_API_TOKEN:-my-secret-token}
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -32,6 +36,4 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     privileged: true
-    ports:
-      - "8080:8080"
     restart: unless-stopped
