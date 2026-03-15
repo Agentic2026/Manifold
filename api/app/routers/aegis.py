@@ -124,6 +124,12 @@ MOCK_NODES: List[TopologyNode] = [
         type="gateway",
         position={"x": 60, "y": 300},
         description="Public-facing load balancer. Routes all external traffic to internal services via TLS termination.",
+        telemetry=NodeTelemetry(ingressMbps=45.2, egressMbps=38.7, latencyMs=12, errorRate=0.01),
+        analysis=NodeAnalysis(
+            summary="Operating within normal parameters. No anomalous traffic patterns detected in the last 24 hours.",
+            findings=[],
+            recommendations=["Consider enabling WAF rules for SQL-injection signatures."],
+        ),
     ),
     TopologyNode(
         id="web-front",
@@ -133,6 +139,12 @@ MOCK_NODES: List[TopologyNode] = [
         type="frontend",
         position={"x": 320, "y": 120},
         description="React SPA served via CDN. Communicates with backend APIs and Auth Service.",
+        telemetry=NodeTelemetry(ingressMbps=12.4, egressMbps=8.1, latencyMs=22, errorRate=0.02),
+        analysis=NodeAnalysis(
+            summary="No client-side injection risks detected. CSP headers are configured correctly.",
+            findings=[],
+            recommendations=["Rotate the service account token used for auth-read."],
+        ),
     ),
     TopologyNode(
         id="auth-svc",
@@ -142,6 +154,12 @@ MOCK_NODES: List[TopologyNode] = [
         type="service",
         position={"x": 620, "y": 50},
         description="Handles authentication and session management. Issues short-lived JWTs.",
+        telemetry=NodeTelemetry(ingressMbps=3.1, egressMbps=2.8, latencyMs=18, errorRate=0.0),
+        analysis=NodeAnalysis(
+            summary="Auth flows healthy. No brute-force or credential stuffing patterns observed.",
+            findings=[],
+            recommendations=["Enable passkey (WebAuthn) as a primary factor."],
+        ),
     ),
     TopologyNode(
         id="api-core",
@@ -151,6 +169,20 @@ MOCK_NODES: List[TopologyNode] = [
         type="api",
         position={"x": 400, "y": 320},
         description="Node.js backend hub. Routes requests to downstream services and the LLM agent via MCP bridge.",
+        telemetry=NodeTelemetry(ingressMbps=24.5, egressMbps=12.4, latencyMs=67, errorRate=0.8),
+        analysis=NodeAnalysis(
+            summary="WARNING: Core API Hub is routing requests to the compromised LLM agent. While the API itself shows no sign of RCE, it lacks an egress rate-limiter, allowing the compromised agent to exfiltrate data back through the API's return channels.",
+            findings=[
+                "No egress rate limiter on mcp_bridge_role connection.",
+                "Outdated auth dependencies (passport@0.4.1).",
+                "High latency spike detected — possible resource contention.",
+            ],
+            recommendations=[
+                "Enforce strict egress policies on mcp_bridge_role.",
+                "Rotate the mcp_bridge_role JWT immediately.",
+                "Upgrade passport to latest LTS.",
+            ],
+        ),
     ),
     TopologyNode(
         id="llm-agent",
@@ -160,6 +192,22 @@ MOCK_NODES: List[TopologyNode] = [
         type="agent",
         position={"x": 660, "y": 320},
         description="LLM-powered context agent with MCP tool access. Reads from Vector Store and returns augmented responses.",
+        telemetry=NodeTelemetry(ingressMbps=8.2, egressMbps=31.4, latencyMs=340, errorRate=4.2),
+        analysis=NodeAnalysis(
+            summary="CRITICAL: Prompt injection attack detected. The agent is executing instructions embedded in user-supplied documents. Exfiltration of vector embeddings observed via crafted tool calls.",
+            findings=[
+                "Prompt injection via PDF ingestion endpoint.",
+                "Anomalous tool call volume: 412 calls/min (baseline: 18).",
+                "Outbound data 3.8x above baseline — likely exfiltration.",
+                "Agent bypassing content policy filters via role-play jailbreak.",
+            ],
+            recommendations=[
+                "Isolate this entity immediately.",
+                "Revoke vector_read_role and mcp_bridge_role.",
+                "Audit all tool call logs from the last 6 hours.",
+                "Re-deploy agent with input sanitisation middleware.",
+            ],
+        ),
     ),
     TopologyNode(
         id="db-main",
@@ -169,6 +217,12 @@ MOCK_NODES: List[TopologyNode] = [
         type="database",
         position={"x": 840, "y": 160},
         description="PostgreSQL primary. Stores user records, session data, and application state.",
+        telemetry=NodeTelemetry(ingressMbps=6.3, egressMbps=5.9, latencyMs=4, errorRate=0.0),
+        analysis=NodeAnalysis(
+            summary="No anomalous query patterns. Row-level security is enforced. Connections are limited to db_auth_admin and db_api_rw roles.",
+            findings=[],
+            recommendations=["Schedule next backup verification."],
+        ),
     ),
     TopologyNode(
         id="db-vector",
@@ -178,6 +232,18 @@ MOCK_NODES: List[TopologyNode] = [
         type="database",
         position={"x": 950, "y": 420},
         description="Qdrant vector database. Holds document embeddings used by the Context Agent for RAG.",
+        telemetry=NodeTelemetry(ingressMbps=14.7, egressMbps=28.3, latencyMs=11, errorRate=0.3),
+        analysis=NodeAnalysis(
+            summary="WARNING: Egress traffic is 2x baseline. Likely caused by the compromised LLM agent bulk-reading embeddings. Access should be suspended until the agent is remediated.",
+            findings=[
+                "Bulk read operations from LLM-AGENT account.",
+                "Egress 2x above 7-day baseline.",
+            ],
+            recommendations=[
+                "Suspend vector_read_role until LLM-AGENT is remediated.",
+                "Enable query-level audit logging.",
+            ],
+        ),
     ),
 ]
 
@@ -190,6 +256,144 @@ MOCK_EDGES: List[TopologyEdge] = [
     TopologyEdge(id="e-api-db", source="api-core", target="db-main", kind="network", label="NETWORK: db_api_rw"),
     TopologyEdge(id="e-api-agent", source="api-core", target="llm-agent", kind="api", label="mcp_bridge_role", animated=True),
     TopologyEdge(id="e-agent-vector", source="llm-agent", target="db-vector", kind="api", label="vector_read_role", animated=True),
+]
+
+MOCK_VULNERABILITIES: List[dict] = [
+    {
+        "id": "vuln-001",
+        "title": "Prompt Injection via PDF Ingestion",
+        "severity": "critical",
+        "affected_node_id": "llm-agent",
+        "description": "Malicious instructions embedded in uploaded PDF documents are being executed by the LLM agent without sanitisation, allowing arbitrary tool-call sequences.",
+        "status": "open",
+    },
+    {
+        "id": "vuln-002",
+        "title": "Missing Egress Rate Limiter on MCP Bridge",
+        "severity": "high",
+        "affected_node_id": "api-core",
+        "description": "The mcp_bridge_role connection has no outbound rate limit, enabling a compromised agent to exfiltrate large volumes of data through normal API return channels.",
+        "status": "open",
+    },
+    {
+        "id": "vuln-003",
+        "title": "Outdated Auth Dependency (passport@0.4.1)",
+        "severity": "medium",
+        "affected_node_id": "api-core",
+        "description": "passport@0.4.1 has known session fixation vulnerabilities. Upgrade to v0.7.0+.",
+        "status": "in-progress",
+        "cve": "CVE-2022-25896",
+    },
+    {
+        "id": "vuln-004",
+        "title": "Bulk Embedding Reads by Compromised Agent",
+        "severity": "high",
+        "affected_node_id": "db-vector",
+        "description": "The Context Agent is performing bulk reads of vector embeddings at 2x baseline rate, consistent with exfiltration of sensitive document content.",
+        "status": "open",
+    },
+    {
+        "id": "vuln-005",
+        "title": "Jailbreak via Role-Play Prompt",
+        "severity": "high",
+        "affected_node_id": "llm-agent",
+        "description": "Agent content-policy filters are being bypassed via a role-play framing jailbreak present in attacker-controlled document content.",
+        "status": "open",
+    },
+    {
+        "id": "vuln-006",
+        "title": "Service Account Token Rotation Overdue",
+        "severity": "low",
+        "affected_node_id": "web-front",
+        "description": "The auth_read service account token has not been rotated in 90+ days. Rotation policy recommends 30-day intervals.",
+        "status": "open",
+    },
+]
+
+MOCK_INSIGHTS: List[dict] = [
+    {
+        "id": "ins-001",
+        "node_id": "llm-agent",
+        "type": "threat",
+        "summary": "Prompt injection attack confirmed",
+        "details": "Cross-referencing tool call logs with ingested documents reveals a structured prompt injection payload in 3 of the last 12 PDF uploads. The attacker is using indirect injection to instruct the agent to call the file_read tool with arbitrary paths.",
+        "confidence": 0.97,
+    },
+    {
+        "id": "ins-002",
+        "node_id": "api-core",
+        "type": "anomaly",
+        "summary": "Latency spike correlates with agent exfiltration bursts",
+        "details": "P99 latency on /api/chat increased from 120ms to 680ms in the last 2 hours. Timing analysis correlates spikes with vector store bulk reads — the agent is blocking the response thread while staging exfiltration payloads.",
+        "confidence": 0.88,
+    },
+    {
+        "id": "ins-003",
+        "node_id": "db-vector",
+        "type": "anomaly",
+        "summary": "Embedding namespace enumeration detected",
+        "details": "Query logs show systematic reads across all embedding namespaces in alphabetical order — a pattern consistent with automated enumeration rather than semantic retrieval.",
+        "confidence": 0.82,
+    },
+    {
+        "id": "ins-004",
+        "node_id": "ext-lb",
+        "type": "info",
+        "summary": "Traffic from 3 new ASNs in the last hour",
+        "details": "New source ASNs detected: AS14618 (AWS), AS16509 (AWS), AS15169 (Google). Volume is within normal bounds; likely legitimate cloud-to-cloud traffic. No action required.",
+        "confidence": 0.65,
+    },
+]
+
+MOCK_RBAC: List[dict] = [
+    {
+        "id": "rbac-001",
+        "role": "mcp_bridge_role",
+        "subject": "LLM-AGENT",
+        "permissions": ["api:invoke", "api:stream", "api:read"],
+        "scope": "api-core/*",
+        "risk_level": "high",
+    },
+    {
+        "id": "rbac-002",
+        "role": "vector_read_role",
+        "subject": "LLM-AGENT",
+        "permissions": ["vector:read", "vector:search"],
+        "scope": "db-vector/*",
+        "risk_level": "high",
+    },
+    {
+        "id": "rbac-003",
+        "role": "frontend_role",
+        "subject": "WEB-FRONT",
+        "permissions": ["api:read", "api:write"],
+        "scope": "api-core/public/*",
+        "risk_level": "low",
+    },
+    {
+        "id": "rbac-004",
+        "role": "service_account:auth_read",
+        "subject": "WEB-FRONT",
+        "permissions": ["auth:verify", "auth:refresh"],
+        "scope": "auth-svc/*",
+        "risk_level": "medium",
+    },
+    {
+        "id": "rbac-005",
+        "role": "db_auth_admin",
+        "subject": "AUTH-SVC",
+        "permissions": ["db:read", "db:write", "db:admin"],
+        "scope": "db-main/auth_schema",
+        "risk_level": "medium",
+    },
+    {
+        "id": "rbac-006",
+        "role": "db_api_rw",
+        "subject": "API-CORE",
+        "permissions": ["db:read", "db:write"],
+        "scope": "db-main/app_schema",
+        "risk_level": "low",
+    },
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -396,20 +600,23 @@ def _compute_node_status(
     """Deterministic status engine.
 
     Rules (applied in priority order):
-    1. If no telemetry data exists at all → keep current DB status (may be
-       freshly imported and no containers matched yet).
-    2. If the most recent snapshot is older than ``_STALE_SECONDS`` → ``warning``
-       (stale data).
-    3. If egress > ``_EGRESS_WARNING_MBPS`` → ``warning``.
-    4. Otherwise → ``healthy``.
+    1. ``compromised`` is sticky — only manual action can clear it.
+    2. If no telemetry data exists at all → keep current DB status.
+    3. If the most recent snapshot is stale → ``warning``.
+    4. If egress > threshold → ``warning``.
+    5. Otherwise → keep current DB status (preserves seeded warnings).
 
     This engine never promotes a node to *compromised* – that requires
     stronger evidence (e.g. LLM-driven analysis).
     """
+    # Compromised is sticky — never auto-downgrade
+    if current_status == "compromised":
+        return "compromised"
+
     if telemetry is None:
         return current_status  # no mapped containers or no data yet
 
-    # Staleness check
+    # Staleness check (only for live telemetry with lastSeen timestamps)
     if telemetry.lastSeen:
         try:
             ls = telemetry.lastSeen
@@ -426,7 +633,8 @@ def _compute_node_status(
     if telemetry.egressMbps > _EGRESS_WARNING_MBPS:
         return "warning"
 
-    return "healthy"
+    # Preserve DB status (keeps seeded "warning" states)
+    return current_status
 
 
 async def _compute_security_score(db: AsyncSession) -> SecurityScore:
@@ -461,7 +669,7 @@ async def _compute_security_score(db: AsyncSession) -> SecurityScore:
 
     rbac_q = await db.execute(select(DBRBAC))
     rbacs = rbac_q.scalars().all()
-    high_risk = sum(1 for p in rbacs if p.riskLevel == "high")
+    high_risk = sum(1 for p in rbacs if p.risk_level == "high")
     if high_risk:
         impact = -3 * high_risk
         breakdown.append({"label": f"{high_risk} high-risk RBAC", "impact": impact})
@@ -475,30 +683,52 @@ async def _compute_security_score(db: AsyncSession) -> SecurityScore:
 # ────────────────────────────────────────────────────────────
 
 
-@router.post("/topology/seed")
-async def seed_topology(db: AsyncSession = Depends(get_db_session)) -> dict:
-    """Creates the tables and seeds them with initial data if empty."""
-    from app.core.database import Base
-    # Create the tables if they don't exist
-    conn = await db.connection()
-    await conn.run_sync(Base.metadata.create_all)
-    
-    # Check if empty
+async def seed_demo_data(db: AsyncSession) -> str:
+    """Seed all demo data if the database is empty. Returns status string."""
+    # Check if already seeded
     res = await db.execute(select(DBNode).limit(1))
     if res.scalar_one_or_none():
-        return {"status": "already_seeded"}
-        
+        return "already_seeded"
+
+    # Seed topology nodes (must flush before edges due to FK constraints)
     for n in MOCK_NODES:
         db.add(DBNode(
             id=n.id, label=n.label, service_id=n.serviceId, status=n.status, type=n.type,
-            position=n.position, description=n.description
+            position=n.position, description=n.description,
+            telemetry=n.telemetry.model_dump() if n.telemetry else None,
+            analysis=n.analysis.model_dump() if n.analysis else None,
         ))
+    await db.flush()
+
+    # Seed topology edges
     for e in MOCK_EDGES:
         db.add(DBEdge(
             id=e.id, source_id=e.source, target_id=e.target, kind=e.kind, label=e.label, animated=e.animated
         ))
+    await db.flush()
+    # Seed vulnerabilities
+    for v in MOCK_VULNERABILITIES:
+        db.add(DBVuln(**v))
+    # Seed LLM insights
+    for i in MOCK_INSIGHTS:
+        db.add(DBInsight(**i))
+    # Seed RBAC policies
+    for r in MOCK_RBAC:
+        db.add(DBRBAC(**r))
+
     await db.commit()
-    return {"status": "seeded"}
+    return "seeded"
+
+
+@router.post("/topology/seed")
+async def seed_topology(db: AsyncSession = Depends(get_db_session)) -> dict:
+    """Creates the tables and seeds them with initial data if empty."""
+    from app.core.database import Base
+    conn = await db.connection()
+    await conn.run_sync(Base.metadata.create_all)
+
+    status = await seed_demo_data(db)
+    return {"status": status}
 
 
 @router.post("/topology/import")
@@ -541,28 +771,35 @@ async def import_topology(
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
     nodes_q = await db.execute(select(DBNode))
     edges_q = await db.execute(select(DBEdge))
-    
+
     nodes = []
     for n in nodes_q.scalars().all():
-        # Aggregate real telemetry for this node
+        # Try live telemetry first, fall back to stored/seeded telemetry
         telem = await _aggregate_node_telemetry(n.id, db)
+        if telem is None and n.telemetry and isinstance(n.telemetry, dict):
+            telem = NodeTelemetry(**n.telemetry)
 
-        # Deterministic status engine
+        # Deterministic status engine (preserves DB status when no live telemetry)
         status = _compute_node_status(n.status, telem)
+
+        # Parse stored analysis
+        analysis = None
+        if n.analysis and isinstance(n.analysis, dict):
+            analysis = NodeAnalysis(**n.analysis)
 
         nodes.append(TopologyNode(
             id=n.id, label=n.label, serviceId=n.service_id, status=status, type=n.type,
             position=n.position, description=n.description,
             telemetry=telem,
-            analysis=n.analysis if isinstance(n.analysis, dict) else None,
+            analysis=analysis,
         ))
-        
+
     edges = []
     for e in edges_q.scalars().all():
         edges.append(TopologyEdge(
             id=e.id, source=e.source_id, target=e.target_id, kind=e.kind, label=e.label, animated=e.animated
         ))
-        
+
     return TopologyData(
         nodes=nodes,
         edges=edges,
@@ -572,11 +809,14 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
 
 
 @router.post("/topology/scan", response_model=TopologyData)
-async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
-    # Trigger the background LangGraph DAG topology agent
-    analysis_update = await run_topology_analysis(db)
-    
-    # Return topology with scanning status true (frontend usually polls afterward)
+async def run_scan(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
+    # Try the LangGraph agent; fall back gracefully if OpenAI key missing
+    try:
+        await run_topology_analysis(db)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Topology scan agent skipped: {e}")
+
     topo = await get_topology(db)
     topo.scanStatus = "complete"
     return topo
@@ -590,11 +830,17 @@ async def isolate_node(node_id: str, db: AsyncSession = Depends(get_db_session))
 @router.get("/vulnerabilities", response_model=List[Vulnerability])
 async def get_vulnerabilities(db: AsyncSession = Depends(get_db_session)) -> List[Vulnerability]:
     q = await db.execute(select(DBVuln))
+    # Build a node_id → label lookup for human-readable affectedNode name
+    nodes_q = await db.execute(select(DBNode.id, DBNode.label))
+    node_labels = {r[0]: r[1] for r in nodes_q.all()}
+
     return [
         Vulnerability(
-            id=v.id, title=v.title, severity=v.severity, affectedNode=v.affected_node_id,
-            affectedNodeId=v.affected_node_id, description=v.description, 
-            discoveredAt=v.discovered_at.isoformat(), status=v.status, cve=v.cve
+            id=v.id, title=v.title, severity=v.severity,
+            affectedNode=node_labels.get(v.affected_node_id, v.affected_node_id),
+            affectedNodeId=v.affected_node_id, description=v.description,
+            discoveredAt=v.discovered_at.isoformat() if v.discovered_at else _iso(),
+            status=v.status, cve=v.cve
         ) for v in q.scalars().all()
     ]
 
@@ -602,10 +848,18 @@ async def get_vulnerabilities(db: AsyncSession = Depends(get_db_session)) -> Lis
 @router.get("/insights", response_model=List[LLMInsight])
 async def get_insights(db: AsyncSession = Depends(get_db_session)) -> List[LLMInsight]:
     q = await db.execute(select(DBInsight))
+    # Build a node_id → label lookup for human-readable nodeName
+    nodes_q = await db.execute(select(DBNode.id, DBNode.label))
+    node_labels = {r[0]: r[1] for r in nodes_q.all()}
+
     return [
         LLMInsight(
-            id=i.id, nodeId=i.node_id, nodeName=i.node_id, type=i.type, summary=i.summary,
-            details=i.details, timestamp=i.timestamp.isoformat(), confidence=i.confidence
+            id=i.id, nodeId=i.node_id,
+            nodeName=node_labels.get(i.node_id, i.node_id),
+            type=i.type, summary=i.summary,
+            details=i.details,
+            timestamp=i.timestamp.isoformat() if i.timestamp else _iso(),
+            confidence=i.confidence
         ) for i in q.scalars().all()
     ]
 
@@ -616,7 +870,9 @@ async def get_rbac(db: AsyncSession = Depends(get_db_session)) -> List[RBACPolic
     return [
         RBACPolicy(
             id=r.id, role=r.role, subject=r.subject, permissions=r.permissions,
-            scope=r.scope, lastModified=r.last_modified.isoformat(), riskLevel=r.risk_level
+            scope=r.scope,
+            lastModified=r.last_modified.isoformat() if r.last_modified else _iso(),
+            riskLevel=r.risk_level
         ) for r in q.scalars().all()
     ]
 

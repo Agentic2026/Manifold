@@ -40,9 +40,23 @@ add_csp_middleware(app)
 include_all_routers(app)
 
 
+async def _auto_seed_demo_data() -> None:
+    """Auto-seed demo data on startup if the database is empty."""
+    from app.core.database import async_session_maker
+    from app.routers.aegis import seed_demo_data
+
+    async with async_session_maker() as session:
+        status = await seed_demo_data(session)
+        if status == "seeded":
+            logger.info("Demo data seeded automatically on startup.")
+        else:
+            logger.info("Demo data already present — skipping seed.")
+
+
 @app.on_event("startup")
 async def on_startup() -> None:
     await _ensure_tables()
+    await _auto_seed_demo_data()
 
 
 class HealthzResponse(BaseModel):
