@@ -53,8 +53,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db_session
 from app.agents.chat import stream_agent_response
 
-import logging as _logging
-_dashboard_logger = _logging.getLogger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 @router.post("/llm/chat/stream")
 async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_session)) -> Any:
@@ -97,7 +97,7 @@ async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_sessio
                     break
                 yield sse_dict
         except Exception as e:
-            _dashboard_logger.error(f"SSE stream failed: {e}")
+            logger.error(f"SSE stream failed: {e}")
             yield {
                 "event": "message",
                 "data": json.dumps({"token": "\\n\\n**Connection Error:** Stream interrupted."})

@@ -470,11 +470,11 @@ async def test_chat_threat_landscape_gathers_evidence():
     # Should have streamed at least one message event
     data_events = [e for e in events if e.get("event") == "message"]
     assert len(data_events) >= 1
-    # The mocked LLM response should be in there
+    # The mocked LLM response should appear in the stream
     all_tokens = "".join(
         json.loads(e["data"]).get("token", "") for e in data_events
     )
-    assert "internal evidence" in all_tokens or "3 nodes" in all_tokens or all_tokens != ""
+    assert "3 nodes" in all_tokens, f"Expected '3 nodes' in streamed output, got: {all_tokens!r}"
 
 
 @pytest.mark.asyncio
@@ -684,8 +684,11 @@ async def test_chat_tool_failure_surfaces_error():
     data_events = [e for e in events if e.get("event") == "message"]
     assert len(data_events) >= 1
 
-    # Should include uncertainty note about limited evidence
+    # Should include uncertainty note about limited evidence (from verification)
     all_tokens = "".join(
         json.loads(e["data"]).get("token", "") for e in data_events
     )
-    assert "evidence" in all_tokens.lower() or "limited" in all_tokens.lower() or "failed" in all_tokens.lower()
+    # The mock LLM says "Evidence gathering failed" and verification adds "Limited internal evidence"
+    assert "failed" in all_tokens.lower() or "limited" in all_tokens.lower(), (
+        f"Expected error/limitation note in output, got: {all_tokens!r}"
+    )

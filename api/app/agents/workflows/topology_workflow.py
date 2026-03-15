@@ -202,7 +202,7 @@ async def _apply_verified_updates(
 
     for v in result.new_vulnerabilities:
         new_vuln = Vulnerability(
-            id=f"vuln-{uuid.uuid4().hex[:8]}",
+            id=f"vuln-{uuid.uuid4().hex}",
             title=v.title,
             severity=v.severity,
             affected_node_id=v.affected_node_id,
@@ -214,7 +214,7 @@ async def _apply_verified_updates(
 
     for i in result.new_insights:
         new_ins = LLMInsight(
-            id=f"ins-{uuid.uuid4().hex[:8]}",
+            id=f"ins-{uuid.uuid4().hex}",
             node_id=i.node_id,
             type=i.insight_type,
             summary=i.summary,

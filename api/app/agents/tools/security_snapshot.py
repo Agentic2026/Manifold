@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 def _anomaly_id(container_ref: str, metric: str, window: int) -> str:
     """Generate a deterministic evidence ID for an anomaly."""
     raw = f"{container_ref}:{metric}:{window}"
-    return "anom-" + hashlib.sha256(raw.encode()).hexdigest()[:10]
+    return "anom-" + hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _spikes_to_anomalies(

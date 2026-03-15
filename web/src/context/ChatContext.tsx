@@ -55,7 +55,7 @@ const MOCK_RESPONSES: Record<string, string> = {
 let _threadId: string | null = null;
 function getThreadId(): string {
   if (!_threadId) {
-    _threadId = `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    _threadId = `thread-${crypto.randomUUID()}`;
   }
   return _threadId;
 }
