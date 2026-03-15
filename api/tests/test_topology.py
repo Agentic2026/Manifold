@@ -1423,3 +1423,137 @@ async def test_report_fingerprint_stable():
         await session.commit()
 
     assert fp1_deep == fp2_deep
+
+
+# ────────────────────────────────────────────────────────────
+# Test: topology groups metadata
+# ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_topology_response_includes_groups():
+    """GET /topology returns a groups array and per-node group metadata."""
+    await _reset_tables()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        await ac.post("/topology/seed")
+        topo = await ac.get("/topology")
+        assert topo.status_code == 200
+        data = topo.json()
+
+        # groups key must be present (may be empty for seeded data)
+        assert "groups" in data
+        assert isinstance(data["groups"], list)
+
+        # Every node should have groupId / groupKind / groupLabel
+        for node in data["nodes"]:
+            assert "groupId" in node
+            assert "groupKind" in node
+            assert "groupLabel" in node
+            assert node["groupKind"] in ("network", "compose", "ungrouped")
+
+
+@pytest.mark.asyncio
+async def test_topology_groups_from_runtime_discovery():
+    """Runtime-discovered containers should produce network-based groups."""
+    await _reset_tables()
+
+    batch = {
+        "schema_version": "1",
+        "sent_at": "2024-01-15T12:34:56.789Z",
+        "machine_name": "test-node",
+        "source": {
+            "component": "cadvisor",
+            "driver": "httpapi",
+            "version": "v0.50.0",
+        },
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/proj-web-1",
+                    "aliases": ["web"],
+                    "namespace": "docker",
+                },
+                "container_spec": {
+                    "image": "nginx:latest",
+                    "labels": {
+                        "com.docker.compose.service": "web",
+                        "com.docker.compose.project": "proj",
+                    },
+                },
+                "stats": {
+                    "timestamp": datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
+                    "cpu": {"usage": {"total": 100000}},
+                    "memory": {"usage": 1000, "working_set": 800},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 100, "tx_bytes": 50}
+                        ]
+                    },
+                    "filesystem": [],
+                },
+            },
+            {
+                "container_reference": {
+                    "name": "/proj-api-1",
+                    "aliases": ["api"],
+                    "namespace": "docker",
+                },
+                "container_spec": {
+                    "image": "python:3.12",
+                    "labels": {
+                        "com.docker.compose.service": "api",
+                        "com.docker.compose.project": "proj",
+                    },
+                },
+                "stats": {
+                    "timestamp": datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
+                    "cpu": {"usage": {"total": 200000}},
+                    "memory": {"usage": 2000, "working_set": 1600},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 200, "tx_bytes": 100}
+                        ]
+                    },
+                    "filesystem": [],
+                },
+            },
+        ],
+    }
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post(
+                "/cadvisor/batch",
+                json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            assert resp.status_code == 202
+
+            topo = await ac.get("/topology")
+            assert topo.status_code == 200
+            data = topo.json()
+
+            # Both nodes should be in groups
+            for node in data["nodes"]:
+                assert node["groupId"] is not None
+                assert node["groupKind"] is not None
+
+            # groups list should be non-empty
+            assert len(data["groups"]) > 0
+
+            # Each group should have nodeIds
+            for g in data["groups"]:
+                assert "id" in g
+                assert "kind" in g
+                assert "label" in g
+                assert "nodeIds" in g
+                assert len(g["nodeIds"]) > 0

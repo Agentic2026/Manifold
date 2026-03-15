@@ -16,6 +16,7 @@
     "check": "npm run gen && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^2.0.4",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@tanstack/react-query": "^5.80.7",
     "@xyflow/react": "^12.10.1",

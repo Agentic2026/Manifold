@@ -58,6 +58,9 @@ class TopologyNode(BaseModel):
     description: Optional[str] = None
     telemetry: Optional[NodeTelemetry] = None
     analysis: Optional[NodeAnalysis] = None
+    groupId: Optional[str] = None
+    groupKind: Optional[str] = None  # "network" | "compose" | "ungrouped"
+    groupLabel: Optional[str] = None
 
 
 class TopologyEdge(BaseModel):
@@ -69,9 +72,17 @@ class TopologyEdge(BaseModel):
     animated: Optional[bool] = False
 
 
+class TopologyGroup(BaseModel):
+    id: str
+    kind: str  # "network" | "compose" | "ungrouped"
+    label: str
+    nodeIds: List[str]
+
+
 class TopologyData(BaseModel):
     nodes: List[TopologyNode]
     edges: List[TopologyEdge]
+    groups: List[TopologyGroup] = []
     lastUpdated: str
     scanStatus: str  # "idle" | "scanning" | "complete"
 
@@ -651,6 +662,95 @@ async def _compute_security_score(db: AsyncSession) -> SecurityScore:
 
 
 # ────────────────────────────────────────────────────────────
+# Group computation
+# ────────────────────────────────────────────────────────────
+
+
+async def _compute_groups(
+    db: AsyncSession,
+    node_ids: list[str],
+) -> tuple[list[TopologyGroup], dict[str, tuple[str, str, str]]]:
+    """Derive topology groups and per-node group assignments.
+
+    Priority:
+    1. Docker bridge / shared network (from container labels)
+    2. Compose project (from node ID ``project__service``)
+    3. ``ungrouped`` fallback
+
+    Returns ``(groups_list, node_group_map)`` where *node_group_map*
+    maps ``node_id → (groupId, groupKind, groupLabel)``.
+    """
+    from collections import defaultdict, namedtuple
+    from app.models.telemetry import Container
+
+    GroupAssignment = namedtuple("GroupAssignment", ["group_id", "kind", "label"])
+
+    containers_q = await db.execute(select(Container))
+    containers = containers_q.scalars().all()
+
+    # Build network → node_ids mapping from container labels
+    net_members: dict[str, set[str]] = defaultdict(set)
+    node_id_set = set(node_ids)
+    for c in containers:
+        nid = c.topology_node_id
+        if not nid or nid not in node_id_set:
+            continue
+        labels = c.labels if isinstance(c.labels, dict) else {}
+        project = labels.get("com.docker.compose.project")
+        if project:
+            net_members[f"{project}_default"].add(nid)
+        networks_csv = labels.get("com.docker.compose.networks")
+        if networks_csv:
+            for net in networks_csv.split(","):
+                net = net.strip()
+                if net:
+                    net_members[net].add(nid)
+
+    # Assign each node to its best group
+    node_group: dict[str, GroupAssignment] = {}
+    group_nodes: dict[str, set[str]] = defaultdict(set)
+
+    # 1) Network groups (highest priority).
+    # Sort by descending member count so the largest networks claim nodes first,
+    # giving a stable, deterministic assignment when a node appears in multiple nets.
+    for net_name, members in sorted(net_members.items(), key=lambda x: -len(x[1])):
+        for nid in members:
+            if nid not in node_group:
+                gid = f"net:{net_name}"
+                node_group[nid] = GroupAssignment(gid, "network", net_name)
+                group_nodes[gid].add(nid)
+
+    # 2) Compose project fallback
+    for nid in node_ids:
+        if nid in node_group:
+            continue
+        if "__" in nid:
+            project = nid.split("__", 1)[0]
+            gid = f"compose:{project}"
+            node_group[nid] = GroupAssignment(gid, "compose", project)
+            group_nodes[gid].add(nid)
+
+    # 3) Ungrouped fallback
+    for nid in node_ids:
+        if nid not in node_group:
+            gid = "ungrouped"
+            node_group[nid] = GroupAssignment(gid, "ungrouped", "Ungrouped")
+            group_nodes[gid].add(nid)
+
+    groups = []
+    for gid, members in group_nodes.items():
+        assignment = node_group[next(iter(members))]
+        groups.append(TopologyGroup(
+            id=gid,
+            kind=assignment.kind,
+            label=assignment.label,
+            nodeIds=sorted(members),
+        ))
+
+    return groups, node_group
+
+
+# ────────────────────────────────────────────────────────────
 # Endpoints
 # ────────────────────────────────────────────────────────────
 
@@ -772,8 +872,15 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
     node_statuses = await _compute_effective_node_statuses(db)
     edges_q = await db.execute(select(DBEdge))
 
+    node_id_list = [n.id for n, _, _ in node_statuses]
+    groups, node_group_map = await _compute_groups(db, node_id_list)
+
     nodes = []
     for n, status, telem in node_statuses:
+        assignment = node_group_map.get(n.id)
+        gid = assignment.group_id if assignment else "ungrouped"
+        gkind = assignment.kind if assignment else "ungrouped"
+        glabel = assignment.label if assignment else "Ungrouped"
         nodes.append(
             TopologyNode(
                 id=n.id,
@@ -785,6 +892,9 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
                 description=n.description,
                 telemetry=telem,
                 analysis=n.analysis if isinstance(n.analysis, dict) else None,
+                groupId=gid,
+                groupKind=gkind,
+                groupLabel=glabel,
             )
         )
 
@@ -804,6 +914,7 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
     return TopologyData(
         nodes=nodes,
         edges=edges,
+        groups=groups,
         lastUpdated=datetime.now(UTC).isoformat(),
         scanStatus="idle",
     )
