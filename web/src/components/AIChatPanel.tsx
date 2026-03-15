@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   BrainCircuit,
   X,
@@ -58,7 +58,7 @@ function renderMarkdown(text: string) {
 
 function renderInline(text: string) {
   // Bold (**text**) and inline code (`code`)
-  const parts: (string | JSX.Element)[] = [];
+  const parts: React.ReactNode[] = [];
   const regex = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;

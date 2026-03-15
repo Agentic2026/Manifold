@@ -26,7 +26,7 @@ describe("aegisApi.getTopology", () => {
 
     const result = await aegisApi.getTopology();
     expect(result).toEqual(liveData);
-    expect(result!.nodes[0].id).toBe("svc");
+    expect(result!.nodes[0]?.id).toBe("svc");
   });
 
   it("returns null (not mock data) when backend is unreachable in live mode", async () => {
@@ -75,9 +75,9 @@ describe("NodeTelemetry optional fields", () => {
     const result = await aegisApi.getTopology();
     expect(result).not.toBeNull();
     const node = result!.nodes[0];
-    expect(node.telemetry?.ingressMbps).toBe(1.5);
-    expect(node.telemetry?.latencyMs).toBeNull();
-    expect(node.telemetry?.errorRate).toBeNull();
-    expect(node.telemetry?.lastSeen).toBeDefined();
+    expect(node?.telemetry?.ingressMbps).toBe(1.5);
+    expect(node?.telemetry?.latencyMs).toBeNull();
+    expect(node?.telemetry?.errorRate).toBeNull();
+    expect(node?.telemetry?.lastSeen).toBeDefined();
   });
 });

@@ -132,7 +132,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const simulateMock = (asstId: string) => {
         const mockKey = nodeContext?.status ?? "default";
         const response =
-          MOCK_RESPONSES[mockKey] ?? MOCK_RESPONSES.default;
+          MOCK_RESPONSES[mockKey] ?? MOCK_RESPONSES.default ?? "";
         const tokens = response.split("");
         let i = 0;
         const interval = setInterval(() => {
