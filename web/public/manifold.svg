@@ -1,5 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" role="img" aria-label="Manifold">
-  <rect width="32" height="32" rx="8" fill="#6366f1" opacity="0.1"/>
-  <path d="M8 24V8l8 10 8-10v16" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="16" cy="14" r="2" fill="#6366f1" opacity="0.5"/>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Manifold icon</title>
+  <desc id="desc">A minimal Manifold icon with equal-sized vertices layered over an abstract M-shaped DAG, rendered in a harmonized blue palette on a blue background.</desc>
+
+  <rect width="256" height="256" rx="32" fill="#0B1F3A"/>
+
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M44 144L82 82L128 128L174 82L212 144" stroke="#5B8CFF" stroke-width="8" opacity="0.24"/>
+    <path d="M44 196L82 134L128 180L174 134L212 196" stroke="#8DB5FF" stroke-width="8" opacity="0.24"/>
+
+    <path d="M44 170L82 94L128 152L174 94L212 170" stroke="#D7E6FF" stroke-width="12"/>
+  </g>
+
+  <g fill="#A9C8FF">
+    <circle cx="44" cy="170" r="13"/>
+    <circle cx="82" cy="94" r="13"/>
+    <circle cx="128" cy="152" r="13"/>
+    <circle cx="174" cy="94" r="13"/>
+    <circle cx="212" cy="170" r="13"/>
+  </g>
 </svg>
