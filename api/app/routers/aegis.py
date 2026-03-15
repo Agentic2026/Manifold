@@ -680,17 +680,20 @@ async def _compute_groups(
     Returns ``(groups_list, node_group_map)`` where *node_group_map*
     maps ``node_id → (groupId, groupKind, groupLabel)``.
     """
-    from collections import defaultdict
+    from collections import defaultdict, namedtuple
     from app.models.telemetry import Container
+
+    GroupAssignment = namedtuple("GroupAssignment", ["group_id", "kind", "label"])
 
     containers_q = await db.execute(select(Container))
     containers = containers_q.scalars().all()
 
     # Build network → node_ids mapping from container labels
     net_members: dict[str, set[str]] = defaultdict(set)
+    node_id_set = set(node_ids)
     for c in containers:
         nid = c.topology_node_id
-        if not nid or nid not in set(node_ids):
+        if not nid or nid not in node_id_set:
             continue
         labels = c.labels if isinstance(c.labels, dict) else {}
         project = labels.get("com.docker.compose.project")
@@ -704,15 +707,17 @@ async def _compute_groups(
                     net_members[net].add(nid)
 
     # Assign each node to its best group
-    node_group: dict[str, tuple[str, str, str]] = {}
+    node_group: dict[str, GroupAssignment] = {}
     group_nodes: dict[str, set[str]] = defaultdict(set)
 
-    # 1) Network groups (highest priority)
+    # 1) Network groups (highest priority).
+    # Sort by descending member count so the largest networks claim nodes first,
+    # giving a stable, deterministic assignment when a node appears in multiple nets.
     for net_name, members in sorted(net_members.items(), key=lambda x: -len(x[1])):
         for nid in members:
             if nid not in node_group:
                 gid = f"net:{net_name}"
-                node_group[nid] = (gid, "network", net_name)
+                node_group[nid] = GroupAssignment(gid, "network", net_name)
                 group_nodes[gid].add(nid)
 
     # 2) Compose project fallback
@@ -722,24 +727,23 @@ async def _compute_groups(
         if "__" in nid:
             project = nid.split("__", 1)[0]
             gid = f"compose:{project}"
-            node_group[nid] = (gid, "compose", project)
+            node_group[nid] = GroupAssignment(gid, "compose", project)
             group_nodes[gid].add(nid)
 
     # 3) Ungrouped fallback
     for nid in node_ids:
         if nid not in node_group:
             gid = "ungrouped"
-            node_group[nid] = (gid, "ungrouped", "Ungrouped")
+            node_group[nid] = GroupAssignment(gid, "ungrouped", "Ungrouped")
             group_nodes[gid].add(nid)
 
     groups = []
     for gid, members in group_nodes.items():
-        kind = node_group[next(iter(members))][1]
-        label = node_group[next(iter(members))][2]
+        assignment = node_group[next(iter(members))]
         groups.append(TopologyGroup(
             id=gid,
-            kind=kind,
-            label=label,
+            kind=assignment.kind,
+            label=assignment.label,
             nodeIds=sorted(members),
         ))
 
@@ -873,7 +877,10 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
 
     nodes = []
     for n, status, telem in node_statuses:
-        gid, gkind, glabel = node_group_map.get(n.id, ("ungrouped", "ungrouped", "Ungrouped"))
+        assignment = node_group_map.get(n.id)
+        gid = assignment.group_id if assignment else "ungrouped"
+        gkind = assignment.kind if assignment else "ungrouped"
+        glabel = assignment.label if assignment else "Ungrouped"
         nodes.append(
             TopologyNode(
                 id=n.id,

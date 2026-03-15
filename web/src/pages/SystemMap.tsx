@@ -541,6 +541,8 @@ function StatusBar({ nodes }: { nodes: TopologyNode[] }) {
 // Main page
 // ────────────────────────────────────────────────────────────
 
+const OVERVIEW_SENTINEL = "__overview__";
+
 export function SystemMap() {
   const [topologyNodes, setTopologyNodes] = useState<TopologyNode[]>([]);
   const [topologyEdges, setTopologyEdges] = useState<TopologyEdge[]>([]);
@@ -655,7 +657,7 @@ export function SystemMap() {
       for (const e of focusedData.crossGroupEdges) {
         sEdges.push({
           ...toRFEdge(e),
-          id: `cross-${e.id}`,
+          id: `xgroup::${e.id}`,
           style: { opacity: 0.2, strokeDasharray: "6 3" },
         });
       }
@@ -795,14 +797,14 @@ export function SystemMap() {
           {topologyGroups.length > 0 && (
             <select
               aria-label="Group selector"
-              value={selectedGroupId ?? "__overview__"}
+              value={selectedGroupId ?? OVERVIEW_SENTINEL}
               onChange={(e) => {
                 const val = e.target.value;
-                handleGroupSelect(val === "__overview__" ? null : val);
+                handleGroupSelect(val === OVERVIEW_SENTINEL ? null : val);
               }}
               className="text-xs bg-surface-alt border border-border rounded-lg px-2.5 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="__overview__">All groups (overview)</option>
+              <option value={OVERVIEW_SENTINEL}>All groups (overview)</option>
               {topologyGroups.map(g => (
                 <option key={g.id} value={g.id}>{g.label} ({g.kind})</option>
               ))}

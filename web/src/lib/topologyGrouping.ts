@@ -105,6 +105,8 @@ export function buildOverviewGroups(
   });
 }
 
+const GROUP_PAIR_DELIMITER = "||";
+
 /**
  * Build inter-group edges for overview mode.
  * Only edges whose source and target belong to different groups are included.
@@ -123,7 +125,7 @@ export function buildOverviewEdges(
     const tg = nodeGroup.get(e.target);
     if (!sg || !tg || sg === tg) continue;
 
-    const pairKey = [sg, tg].sort().join("||");
+    const pairKey = [sg, tg].sort().join(GROUP_PAIR_DELIMITER);
     if (seen.has(pairKey)) continue;
     seen.add(pairKey);
 
