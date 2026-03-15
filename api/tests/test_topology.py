@@ -1288,7 +1288,11 @@ async def test_report_generation_with_changes():
 
     scan_result = {
         "node_updates": [
-            {"node_id": "api-core", "new_status": "warning", "rationale": "high latency"},
+            {
+                "node_id": "api-core",
+                "new_status": "warning",
+                "rationale": "high latency",
+            },
         ],
         "new_vulnerabilities": [
             {

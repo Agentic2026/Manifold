@@ -122,9 +122,7 @@ async def generate_reports(
     det_events = detection_events or []
     det_summaries = detection_summaries or []
 
-    has_material_change = bool(
-        node_updates or new_vulns or new_insights or det_events
-    )
+    has_material_change = bool(node_updates or new_vulns or new_insights or det_events)
 
     # ── Deep-scan report ────────────────────────────────────
     deep_fp_data = {
@@ -218,9 +216,9 @@ async def generate_reports(
         payload={
             "detection_event_count": len(det_events),
             "detection_event_ids": [e.get("id", "") for e in det_events],
-            "affected_node_ids": list(set(
-                e.get("node_id") for e in det_events if e.get("node_id")
-            )),
+            "affected_node_ids": list(
+                set(e.get("node_id") for e in det_events if e.get("node_id"))
+            ),
             "node_updates_count": len(node_updates),
             "new_vulnerabilities_count": len(new_vulns),
             "new_insights_count": len(new_insights),

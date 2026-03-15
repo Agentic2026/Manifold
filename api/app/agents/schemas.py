@@ -173,15 +173,11 @@ class DetectionEvent(BaseModel):
     container_id: Optional[str] = Field(
         default=None, description="Container reference name"
     )
-    severity: str = Field(
-        default="info", description="'info', 'warning', 'critical'"
-    )
+    severity: str = Field(default="info", description="'info', 'warning', 'critical'")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     title: str = Field(description="Short human-readable title")
     summary: str = Field(description="Brief description of what was detected")
-    details: Optional[str] = Field(
-        default=None, description="Extended details"
-    )
+    details: Optional[str] = Field(default=None, description="Extended details")
     metrics: dict = Field(default_factory=dict, description="Supporting metrics")
     detected_at: str = Field(description="ISO timestamp of detection")
     lookback_seconds: int = Field(description="Lookback window used by the detector")
@@ -192,7 +188,9 @@ class NodeDetectionSummary(BaseModel):
     """Aggregated detection summary for a single topology node."""
 
     node_id: str
-    max_severity: str = Field(default="info", description="'info', 'warning', 'critical'")
+    max_severity: str = Field(
+        default="info", description="'info', 'warning', 'critical'"
+    )
     detection_count: int = 0
     detection_kinds: List[str] = Field(default_factory=list)
     events: List[DetectionEvent] = Field(default_factory=list)

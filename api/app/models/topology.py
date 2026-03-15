@@ -140,5 +140,7 @@ class SecurityReport(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     max_status = Column(String, nullable=False)  # "healthy" | "warning" | "compromised"
     fingerprint = Column(String, nullable=False)  # stable hash of meaningful scan state
-    trigger = Column(String, nullable=False, default="manual")  # "manual" | "scheduled" | "api"
+    trigger = Column(
+        String, nullable=False, default="manual"
+    )  # "manual" | "scheduled" | "api"
     payload = Column(JSON, nullable=True)  # arbitrary structured metadata

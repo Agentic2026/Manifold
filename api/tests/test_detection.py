@@ -55,9 +55,18 @@ def _make_batch(now_iso, samples):
     }
 
 
-def _make_sample(name, project, service, timestamp,
-                  cpu_total=100000, mem_usage=10_000_000, mem_ws=8_000_000,
-                  rx_bytes=1000, tx_bytes=500, fs_usage=None):
+def _make_sample(
+    name,
+    project,
+    service,
+    timestamp,
+    cpu_total=100000,
+    mem_usage=10_000_000,
+    mem_ws=8_000_000,
+    rx_bytes=1000,
+    tx_bytes=500,
+    fs_usage=None,
+):
     sample = {
         "container_reference": {
             "name": name,
@@ -91,6 +100,7 @@ def _make_sample(name, project, service, timestamp,
 # 1. Ingestion → detector → immediate warning state
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_ingestion_triggers_detector_and_updates_status():
     """Simulated egress burst ingestion should update topology-visible
@@ -103,14 +113,34 @@ async def test_ingestion_triggers_detector_and_updates_status():
 
     # Two snapshots with massive egress delta to trigger egress_burst
     # demo profile: threshold 5 Mbps; tx delta = 100MB in 30s = ~26 Mbps
-    batch1 = _make_batch(t1, [
-        _make_sample("/proj-api-1", "proj", "api", t1,
-                     cpu_total=100000, tx_bytes=1_000_000, rx_bytes=1000),
-    ])
-    batch2 = _make_batch(t2, [
-        _make_sample("/proj-api-1", "proj", "api", t2,
-                     cpu_total=200000, tx_bytes=100_000_000, rx_bytes=2000),
-    ])
+    batch1 = _make_batch(
+        t1,
+        [
+            _make_sample(
+                "/proj-api-1",
+                "proj",
+                "api",
+                t1,
+                cpu_total=100000,
+                tx_bytes=1_000_000,
+                rx_bytes=1000,
+            ),
+        ],
+    )
+    batch2 = _make_batch(
+        t2,
+        [
+            _make_sample(
+                "/proj-api-1",
+                "proj",
+                "api",
+                t2,
+                cpu_total=200000,
+                tx_bytes=100_000_000,
+                rx_bytes=2000,
+            ),
+        ],
+    )
 
     with (
         patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN),
@@ -121,13 +151,15 @@ async def test_ingestion_triggers_detector_and_updates_status():
         ) as ac:
             # Ingest two batches
             resp1 = await ac.post(
-                "/cadvisor/batch", json=batch1,
+                "/cadvisor/batch",
+                json=batch1,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             assert resp1.status_code == 202
 
             resp2 = await ac.post(
-                "/cadvisor/batch", json=batch2,
+                "/cadvisor/batch",
+                json=batch2,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             assert resp2.status_code == 202
@@ -139,9 +171,7 @@ async def test_ingestion_triggers_detector_and_updates_status():
             topo = await ac.get("/topology")
             assert topo.status_code == 200
             data = topo.json()
-            api_node = next(
-                (n for n in data["nodes"] if n["id"] == "proj__api"), None
-            )
+            api_node = next((n for n in data["nodes"] if n["id"] == "proj__api"), None)
             assert api_node is not None
             # With the egress burst, detection lane should flag it
             assert api_node["status"] in ("warning", "compromised")
@@ -150,6 +180,7 @@ async def test_ingestion_triggers_detector_and_updates_status():
 # ────────────────────────────────────────────────────────────
 # 2. Detector → agentic report (reports reference detections)
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_detector_events_feed_into_reports():
@@ -196,7 +227,8 @@ async def test_detector_events_feed_into_reports():
 
     async with TestSessionLocal() as session:
         reports = await generate_reports(
-            session, scan_result,
+            session,
+            scan_result,
             trigger="detection",
             detection_events=det_events,
             detection_summaries=det_summaries,
@@ -219,6 +251,7 @@ async def test_detector_events_feed_into_reports():
 # 3. Demo profile sensitivity
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_demo_profile_more_sensitive_than_normal():
     """Same telemetry under demo profile should produce more detections."""
@@ -230,12 +263,18 @@ async def test_demo_profile_more_sensitive_than_normal():
 
     # Moderate egress: 10 Mbps — above demo threshold (5) but below normal (50)
     # tx delta = 10 Mbps => ~75 MB in 60 seconds => 75_000_000 bytes
-    batch1 = _make_batch(t1, [
-        _make_sample("/proj-web-1", "proj", "web", t1, tx_bytes=1_000_000),
-    ])
-    batch2 = _make_batch(t2, [
-        _make_sample("/proj-web-1", "proj", "web", t2, tx_bytes=76_000_000),
-    ])
+    batch1 = _make_batch(
+        t1,
+        [
+            _make_sample("/proj-web-1", "proj", "web", t1, tx_bytes=1_000_000),
+        ],
+    )
+    batch2 = _make_batch(
+        t2,
+        [
+            _make_sample("/proj-web-1", "proj", "web", t2, tx_bytes=76_000_000),
+        ],
+    )
 
     from app.services.detection import run_detectors
 
@@ -248,11 +287,13 @@ async def test_demo_profile_more_sensitive_than_normal():
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             await ac.post(
-                "/cadvisor/batch", json=batch1,
+                "/cadvisor/batch",
+                json=batch1,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             await ac.post(
-                "/cadvisor/batch", json=batch2,
+                "/cadvisor/batch",
+                json=batch2,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
 
@@ -269,11 +310,13 @@ async def test_demo_profile_more_sensitive_than_normal():
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             await ac.post(
-                "/cadvisor/batch", json=batch1,
+                "/cadvisor/batch",
+                json=batch1,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             await ac.post(
-                "/cadvisor/batch", json=batch2,
+                "/cadvisor/batch",
+                json=batch2,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
 
@@ -292,6 +335,7 @@ async def test_demo_profile_more_sensitive_than_normal():
 # 4. Multi-signal correlation
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_multi_signal_correlation():
     """Mixed incident behaviour should generate multi-signal correlation
@@ -303,16 +347,36 @@ async def test_multi_signal_correlation():
     t2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # High CPU + high egress to trigger both cpu_abuse and egress_burst (demo)
-    batch1 = _make_batch(t1, [
-        _make_sample("/proj-api-1", "proj", "api", t1,
-                     cpu_total=1_000_000_000,
-                     tx_bytes=1_000_000, mem_usage=100_000_000, mem_ws=80_000_000),
-    ])
-    batch2 = _make_batch(t2, [
-        _make_sample("/proj-api-1", "proj", "api", t2,
-                     cpu_total=20_000_000_000,
-                     tx_bytes=100_000_000, mem_usage=200_000_000, mem_ws=180_000_000),
-    ])
+    batch1 = _make_batch(
+        t1,
+        [
+            _make_sample(
+                "/proj-api-1",
+                "proj",
+                "api",
+                t1,
+                cpu_total=1_000_000_000,
+                tx_bytes=1_000_000,
+                mem_usage=100_000_000,
+                mem_ws=80_000_000,
+            ),
+        ],
+    )
+    batch2 = _make_batch(
+        t2,
+        [
+            _make_sample(
+                "/proj-api-1",
+                "proj",
+                "api",
+                t2,
+                cpu_total=20_000_000_000,
+                tx_bytes=100_000_000,
+                mem_usage=200_000_000,
+                mem_ws=180_000_000,
+            ),
+        ],
+    )
 
     from app.services.detection import run_detectors
 
@@ -324,11 +388,13 @@ async def test_multi_signal_correlation():
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             await ac.post(
-                "/cadvisor/batch", json=batch1,
+                "/cadvisor/batch",
+                json=batch1,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             await ac.post(
-                "/cadvisor/batch", json=batch2,
+                "/cadvisor/batch",
+                json=batch2,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
 
@@ -342,7 +408,9 @@ async def test_multi_signal_correlation():
     # Multi-signal correlation should have higher confidence than individual events
     multi = [e for e in events if e.kind == "multi_signal_correlation"][0]
     singles = [e for e in events if e.kind != "multi_signal_correlation"]
-    avg_single_conf = sum(s.confidence for s in singles) / len(singles) if singles else 0
+    avg_single_conf = (
+        sum(s.confidence for s in singles) / len(singles) if singles else 0
+    )
     assert multi.confidence >= avg_single_conf
 
     # Node summary should recommend "warning"
@@ -356,6 +424,7 @@ async def test_multi_signal_correlation():
 # 5. Manual deep scan consumes precomputed detections
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_manual_scan_consumes_detections():
     """Manual deep scan should work and consume precomputed detections
@@ -364,11 +433,13 @@ async def test_manual_scan_consumes_detections():
 
     # Mock LLM to return empty analysis (we just want to verify detection
     # events flow through to reports)
-    mock_run_analysis = AsyncMock(return_value={
-        "node_updates": [],
-        "new_vulnerabilities": [],
-        "new_insights": [],
-    })
+    mock_run_analysis = AsyncMock(
+        return_value={
+            "node_updates": [],
+            "new_vulnerabilities": [],
+            "new_insights": [],
+        }
+    )
 
     with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
         async with AsyncClient(
@@ -388,10 +459,15 @@ async def test_manual_scan_consumes_detections():
 # Unit tests for detector functions
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_detection_schemas():
     """Detection schemas should be constructable and serializable."""
-    from app.agents.schemas import DetectionEvent, NodeDetectionSummary, DetectionEvidenceRef
+    from app.agents.schemas import (
+        DetectionEvent,
+        NodeDetectionSummary,
+        DetectionEvidenceRef,
+    )
 
     ref = DetectionEvidenceRef(
         ref_type="metric_snapshot", ref_id="snap-123", description="test"
@@ -477,13 +553,23 @@ async def test_status_engine_with_detection_severity():
         egressMbps=2.0,
         lastSeen=datetime.now(timezone.utc).isoformat(),
     )
-    assert _compute_node_status("healthy", telem, detection_severity="warning") == "warning"
-    assert _compute_node_status("healthy", telem, detection_severity="critical") == "warning"
+    assert (
+        _compute_node_status("healthy", telem, detection_severity="warning")
+        == "warning"
+    )
+    assert (
+        _compute_node_status("healthy", telem, detection_severity="critical")
+        == "warning"
+    )
     assert _compute_node_status("healthy", telem, detection_severity=None) == "healthy"
-    assert _compute_node_status("healthy", telem, detection_severity="info") == "healthy"
+    assert (
+        _compute_node_status("healthy", telem, detection_severity="info") == "healthy"
+    )
 
     # No telemetry, detection severity provided
-    assert _compute_node_status("healthy", None, detection_severity="warning") == "warning"
+    assert (
+        _compute_node_status("healthy", None, detection_severity="warning") == "warning"
+    )
 
 
 @pytest.mark.asyncio
@@ -492,16 +578,20 @@ async def test_ingest_returns_detection_metadata():
     await _reset_tables()
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    batch = _make_batch(now, [
-        _make_sample("/proj-api-1", "proj", "api", now),
-    ])
+    batch = _make_batch(
+        now,
+        [
+            _make_sample("/proj-api-1", "proj", "api", now),
+        ],
+    )
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
             resp = await ac.post(
-                "/cadvisor/batch", json=batch,
+                "/cadvisor/batch",
+                json=batch,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             assert resp.status_code == 202

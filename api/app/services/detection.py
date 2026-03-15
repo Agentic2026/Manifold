@@ -116,7 +116,10 @@ def _detect_cpu_abuse(
             f"Container {container_ref} averaged {avg_cores:.2f} CPU cores "
             f"over {elapsed:.0f}s (threshold: {threshold})."
         ),
-        metrics={"avg_cores": round(avg_cores, 4), "elapsed_seconds": round(elapsed, 1)},
+        metrics={
+            "avg_cores": round(avg_cores, 4),
+            "elapsed_seconds": round(elapsed, 1),
+        },
         detected_at=datetime.now(UTC).isoformat(),
         lookback_seconds=lookback,
         evidence_refs=[
@@ -238,7 +241,10 @@ def _detect_egress_burst(
             f"Container {container_ref} egress rate {tx_mbps:.1f} Mbps "
             f"(threshold: {threshold} Mbps)."
         ),
-        metrics={"egress_mbps": round(tx_mbps, 2), "elapsed_seconds": round(elapsed, 1)},
+        metrics={
+            "egress_mbps": round(tx_mbps, 2),
+            "elapsed_seconds": round(elapsed, 1),
+        },
         detected_at=datetime.now(UTC).isoformat(),
         lookback_seconds=lookback,
         evidence_refs=[
@@ -289,7 +295,7 @@ def _detect_beaconing(
     if mean_interval <= 0:
         return None
     variance = sum((x - mean_interval) ** 2 for x in intervals) / len(intervals)
-    std_dev = variance ** 0.5
+    std_dev = variance**0.5
     cv = std_dev / mean_interval
 
     cv_threshold = thresholds["beaconing_cv_threshold"]

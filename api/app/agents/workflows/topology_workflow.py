@@ -287,10 +287,16 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
 
         if not evidence.get("nodes"):
             logger.info("No topology nodes found — skipping analysis")
-            empty_result = {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+            empty_result = {
+                "node_updates": [],
+                "new_vulnerabilities": [],
+                "new_insights": [],
+            }
             try:
                 await generate_reports(
-                    db, empty_result, trigger="manual",
+                    db,
+                    empty_result,
+                    trigger="manual",
                     detection_events=det_events,
                     detection_summaries=det_summaries,
                 )
@@ -314,7 +320,9 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
         # 5. Generate reports (agent lane — includes detection evidence)
         try:
             await generate_reports(
-                db, result, trigger="manual",
+                db,
+                result,
+                trigger="manual",
                 detection_events=det_events,
                 detection_summaries=det_summaries,
             )

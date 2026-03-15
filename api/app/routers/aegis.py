@@ -580,7 +580,9 @@ async def _compute_effective_node_statuses(
     for n in nodes:
         telem = await _aggregate_node_telemetry(n.id, db)
         det_severity = detection_map.get(n.id)
-        effective = _compute_node_status(n.status, telem, detection_severity=det_severity)
+        effective = _compute_node_status(
+            n.status, telem, detection_severity=det_severity
+        )
         results.append((n, effective, telem))
     return results
 
@@ -955,9 +957,7 @@ async def get_security_score(
 async def get_reports(
     db: AsyncSession = Depends(get_db_session),
 ) -> List[SecurityReportResponse]:
-    q = await db.execute(
-        select(DBReport).order_by(DBReport.created_at.desc())
-    )
+    q = await db.execute(select(DBReport).order_by(DBReport.created_at.desc()))
     return [
         SecurityReportResponse(
             id=r.id,
