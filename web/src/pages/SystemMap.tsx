@@ -14,7 +14,7 @@ import {
   Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Globe,
   Monitor as MonitorIcon,
@@ -34,11 +34,13 @@ import {
   RefreshCw,
   BrainCircuit,
   Network,
+  Layers,
 } from "lucide-react";
 import {
   manifoldApi,
   type TopologyNode,
   type TopologyEdge,
+  type TopologyGroup,
   type ServiceType,
   type NodeStatus,
 } from "../api/manifold";
@@ -46,6 +48,14 @@ import { cn } from "../lib/utils";
 import { AnimatedParticleEdge } from "../components/AnimatedParticleEdge";
 import { useToast } from "../context/ToastContext";
 import { useChat } from "../context/ChatContext";
+import {
+  type ViewMode,
+  buildOverviewGroups,
+  buildOverviewEdges,
+  buildFocusedGroupData,
+  classifyEdge,
+} from "../lib/topologyGrouping";
+import { computeDagreLayout } from "../lib/dagreLayout";
 
 // ────────────────────────────────────────────────────────────
 // Icons per service type
@@ -92,7 +102,7 @@ const STATUS_DOT: Record<NodeStatus, string> = {
 };
 
 // ────────────────────────────────────────────────────────────
-// Custom Node
+// Custom Node – compact service node for focused mode
 // ────────────────────────────────────────────────────────────
 
 interface ServiceNodeData {
@@ -110,64 +120,107 @@ function ServiceNode({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        "relative bg-surface-raised border-2 rounded-xl px-3.5 py-2.5 min-w-[148px] shadow-lg",
-        "transition-all duration-150",
+        "relative bg-surface-raised border-2 rounded-lg px-2.5 py-1.5 shadow-md",
+        "transition-all duration-150 min-w-[110px]",
         STATUS_BORDER[d.status],
+        selected
+          ? "ring-2 ring-primary ring-offset-2 ring-offset-surface"
+          : "hover:shadow-lg",
+      )}
+    >
+      {d.status === "compromised" && (
+        <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-compromised text-white text-[7px] font-bold shadow">
+          !
+        </span>
+      )}
+
+      <div className="flex items-center gap-1.5">
+        <Icon
+          className={cn(
+            "w-3 h-3 flex-shrink-0",
+            d.status === "compromised"
+              ? "text-compromised"
+              : d.status === "warning"
+                ? "text-suspicious"
+                : "text-primary",
+          )}
+        />
+        <span className="text-[11px] font-semibold text-text leading-tight truncate max-w-[90px]">
+          {d.label}
+        </span>
+        <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 ml-auto", STATUS_DOT[d.status])} />
+      </div>
+
+      <Handle type="target" position={Position.Left}  />
+      <Handle type="target" position={Position.Top}   />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Bottom}/>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Custom Node – group node for overview mode
+// ────────────────────────────────────────────────────────────
+
+interface GroupNodeData {
+  label: string;
+  kind: string;
+  total: number;
+  healthy: number;
+  warning: number;
+  compromised: number;
+  [key: string]: unknown;
+}
+
+function GroupNode({ data, selected }: NodeProps) {
+  const d = data as GroupNodeData;
+  const worstStatus: NodeStatus =
+    d.compromised > 0 ? "compromised" : d.warning > 0 ? "warning" : "healthy";
+
+  return (
+    <div
+      className={cn(
+        "relative bg-surface-raised border-2 rounded-2xl px-4 py-3 min-w-[170px] shadow-lg",
+        "transition-all duration-150",
+        STATUS_BORDER[worstStatus],
         selected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-surface"
           : "hover:shadow-xl",
       )}
     >
-      {/* Alert badge for compromised */}
-      {d.status === "compromised" && (
-        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-compromised text-white text-[9px] font-bold shadow">
-          !
-        </span>
-      )}
-
-      {/* Header row */}
-      <div className="flex items-center gap-2 mb-1">
-        <div
-          className={cn(
-            "p-1 rounded-md flex-shrink-0",
-            d.status === "compromised"
-              ? "bg-compromised/15"
-              : d.status === "warning"
-                ? "bg-suspicious/15"
-                : "bg-primary/10",
-          )}
-        >
-          <Icon
-            className={cn(
-              "w-3.5 h-3.5",
-              d.status === "compromised"
-                ? "text-compromised"
-                : d.status === "warning"
-                  ? "text-suspicious"
-                  : "text-primary",
-            )}
-          />
-        </div>
-        <span className="text-[13px] font-semibold text-text leading-tight truncate max-w-[100px]">
+      <div className="flex items-center gap-2 mb-2">
+        <Layers className="w-4 h-4 text-primary flex-shrink-0" />
+        <span className="text-sm font-semibold text-text leading-tight truncate">
           {d.label}
         </span>
       </div>
 
-      {/* ID */}
-      <p className="text-[10px] font-mono text-text-muted">{d.serviceId}</p>
+      <p className="text-[10px] text-text-muted mb-2">
+        {d.kind} · {d.total} service{d.total !== 1 ? "s" : ""}
+      </p>
 
-      {/* Status dot */}
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", STATUS_DOT[d.status])} />
-        <span className={cn("text-[10px] font-medium",
-          d.status === "compromised" ? "text-compromised" :
-          d.status === "warning" ? "text-suspicious" : "text-healthy"
-        )}>
-          {STATUS_LABEL[d.status]}
-        </span>
+      <div className="flex items-center gap-3 text-[10px]">
+        {d.healthy > 0 && (
+          <span className="flex items-center gap-1 text-healthy font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-healthy" />
+            {d.healthy}
+          </span>
+        )}
+        {d.warning > 0 && (
+          <span className="flex items-center gap-1 text-suspicious font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-suspicious" />
+            {d.warning}
+          </span>
+        )}
+        {d.compromised > 0 && (
+          <span className="flex items-center gap-1 text-compromised font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-compromised animate-pulse" />
+            {d.compromised}
+          </span>
+        )}
       </div>
 
-      {/* Handles */}
       <Handle type="target" position={Position.Left}  />
       <Handle type="target" position={Position.Top}   />
       <Handle type="source" position={Position.Right} />
@@ -198,6 +251,7 @@ function toRFNode(n: TopologyNode): Node {
 let nodeStatusMap: Record<string, string> = {};
 
 function toRFEdge(e: TopologyEdge): Edge {
+  const edgeClass = classifyEdge(e.label);
   return {
     id: e.id,
     source: e.source,
@@ -205,6 +259,7 @@ function toRFEdge(e: TopologyEdge): Edge {
     type: "particleEdge",
     animated: e.animated ?? false,
     markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+    style: edgeClass === "same-project" ? { opacity: 0.4 } : undefined,
     data: {
       kind: e.kind,
       label: e.label,
@@ -214,7 +269,7 @@ function toRFEdge(e: TopologyEdge): Edge {
   };
 }
 
-const NODE_TYPES = { serviceNode: ServiceNode };
+const NODE_TYPES = { serviceNode: ServiceNode, groupNode: GroupNode };
 const EDGE_TYPES = { particleEdge: AnimatedParticleEdge };
 
 // ────────────────────────────────────────────────────────────
@@ -488,6 +543,8 @@ function StatusBar({ nodes }: { nodes: TopologyNode[] }) {
 
 export function SystemMap() {
   const [topologyNodes, setTopologyNodes] = useState<TopologyNode[]>([]);
+  const [topologyEdges, setTopologyEdges] = useState<TopologyEdge[]>([]);
+  const [topologyGroups, setTopologyGroups] = useState<TopologyGroup[]>([]);
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
@@ -496,6 +553,8 @@ export function SystemMap() {
   const [dataSource, setDataSource] = useState<"live" | "offline" | "empty">("live");
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState(3);
+  const [viewMode, setViewMode] = useState<ViewMode>("overview");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const { addToast } = useToast();
   const { setNodeContext, setIsOpen: setChatOpen } = useChat();
 
@@ -510,17 +569,112 @@ export function SystemMap() {
     }
   }, [selectedNode, setNodeContext]);
 
-  const loadTopology = useCallback((data: { nodes: TopologyNode[]; edges: TopologyEdge[]; lastUpdated: string }) => {
+  // Compute overview group nodes
+  const overviewGroups = useMemo(
+    () => buildOverviewGroups(topologyNodes, topologyGroups),
+    [topologyNodes, topologyGroups],
+  );
+
+  // Compute overview group edges
+  const overviewEdges = useMemo(
+    () => buildOverviewEdges(topologyEdges, topologyNodes),
+    [topologyEdges, topologyNodes],
+  );
+
+  // Compute focused group data when a group is selected
+  const focusedData = useMemo(() => {
+    if (!selectedGroupId) return null;
+    return buildFocusedGroupData(selectedGroupId, topologyNodes, topologyEdges);
+  }, [selectedGroupId, topologyNodes, topologyEdges]);
+
+  // ── Build React Flow nodes/edges for current mode ────────
+  useEffect(() => {
     // Build status map for edge coloring
     nodeStatusMap = {};
-    for (const n of data.nodes) {
+    for (const n of topologyNodes) {
       nodeStatusMap[n.id] = n.status;
     }
+
+    if (viewMode === "overview") {
+      // Overview: render group nodes
+      const gNodes: Node[] = overviewGroups.map((g, i) => ({
+        id: g.id,
+        type: "groupNode",
+        position: { x: 100 + i * 280, y: 150 },
+        data: {
+          label: g.label,
+          kind: g.kind,
+          total: g.health.total,
+          healthy: g.health.healthy,
+          warning: g.health.warning,
+          compromised: g.health.compromised,
+        },
+      }));
+
+      const gEdges: Edge[] = overviewEdges.map(e => ({
+        id: e.id,
+        source: e.sourceGroupId,
+        target: e.targetGroupId,
+        type: "particleEdge",
+        animated: false,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+        data: {
+          kind: e.kind,
+          label: e.label,
+          sourceStatus: "healthy",
+          targetStatus: "healthy",
+        },
+      }));
+
+      setRfNodes(gNodes);
+      setRfEdges(gEdges);
+    } else if (viewMode === "focused" && focusedData) {
+      // Focused: render service nodes with dagre layout
+      const dagrePositions = computeDagreLayout(
+        focusedData.nodes.map(n => ({ id: n.id })),
+        focusedData.internalEdges.map(e => ({ source: e.source, target: e.target })),
+        { direction: "LR", nodeWidth: 140, nodeHeight: 50 },
+      );
+      const posMap = new Map(dagrePositions.map(p => [p.id, p.position]));
+
+      const sNodes: Node[] = focusedData.nodes.map(n => ({
+        id: n.id,
+        type: "serviceNode",
+        position: posMap.get(n.id) ?? n.position,
+        data: {
+          label: n.label,
+          serviceId: n.serviceId,
+          status: n.status,
+          type: n.type,
+        },
+      }));
+
+      const sEdges: Edge[] = focusedData.internalEdges.map(e => toRFEdge(e));
+
+      // Optionally include cross-group edges with faint style
+      for (const e of focusedData.crossGroupEdges) {
+        sEdges.push({
+          ...toRFEdge(e),
+          id: `cross-${e.id}`,
+          style: { opacity: 0.2, strokeDasharray: "6 3" },
+        });
+      }
+
+      setRfNodes(sNodes);
+      setRfEdges(sEdges);
+    } else {
+      // Fallback: show all nodes (legacy flat view)
+      setRfNodes(topologyNodes.map(toRFNode));
+      setRfEdges(topologyEdges.map(toRFEdge));
+    }
+  }, [viewMode, topologyNodes, topologyEdges, overviewGroups, overviewEdges, focusedData, setRfNodes, setRfEdges]);
+
+  const loadTopology = useCallback((data: { nodes: TopologyNode[]; edges: TopologyEdge[]; groups?: TopologyGroup[]; lastUpdated: string }) => {
     setTopologyNodes(data.nodes);
-    setRfNodes(data.nodes.map(toRFNode));
-    setRfEdges(data.edges.map(toRFEdge));
+    setTopologyEdges(data.edges);
+    setTopologyGroups(data.groups ?? []);
     setLastUpdated(new Date(data.lastUpdated));
-  }, [setRfNodes, setRfEdges]);
+  }, []);
 
   const fetchTopology = useCallback(async () => {
     const data = await manifoldApi.getTopology();
@@ -554,15 +708,33 @@ export function SystemMap() {
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (viewMode === "overview") {
+        // Clicking a group node enters focused mode for that group
+        setSelectedGroupId(node.id);
+        setViewMode("focused");
+        return;
+      }
       const found = topologyNodes.find((n) => n.id === node.id);
       setSelectedNode(found ?? null);
     },
-    [topologyNodes],
+    [topologyNodes, viewMode],
   );
 
   const handlePaneClick = useCallback(() => {
     setSelectedNode(null);
   }, []);
+
+  const handleGroupSelect = (groupId: string | null) => {
+    if (groupId === null) {
+      setViewMode("overview");
+      setSelectedGroupId(null);
+      setSelectedNode(null);
+    } else {
+      setViewMode("focused");
+      setSelectedGroupId(groupId);
+      setSelectedNode(null);
+    }
+  };
 
   const handleIsolate = async () => {
     if (!selectedNode) return;
@@ -591,6 +763,11 @@ export function SystemMap() {
   // Filter nodes by search
   const filteredNodes = rfNodes.map((n) => {
     if (!searchQuery) return { ...n, hidden: false };
+    if (n.type === "groupNode") {
+      const data = n.data as GroupNodeData;
+      const match = data.label.toLowerCase().includes(searchQuery.toLowerCase());
+      return { ...n, hidden: !match };
+    }
     const data = n.data as ServiceNodeData;
     const match =
       data.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -602,7 +779,7 @@ export function SystemMap() {
     <div className="flex flex-col h-full">
       {/* ── Page header ─────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 h-14 border-b border-border bg-surface/90 backdrop-blur-md flex-shrink-0">
-        {/* Left: title + status */}
+        {/* Left: title + status + group selector */}
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-sm font-semibold text-text">System Map</h1>
@@ -613,6 +790,25 @@ export function SystemMap() {
               </p>
             )}
           </div>
+
+          {/* Group selector */}
+          {topologyGroups.length > 0 && (
+            <select
+              aria-label="Group selector"
+              value={selectedGroupId ?? "__overview__"}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleGroupSelect(val === "__overview__" ? null : val);
+              }}
+              className="text-xs bg-surface-alt border border-border rounded-lg px-2.5 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="__overview__">All groups (overview)</option>
+              {topologyGroups.map(g => (
+                <option key={g.id} value={g.id}>{g.label} ({g.kind})</option>
+              ))}
+            </select>
+          )}
+
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-monitoring/10 border border-monitoring/20">
             <span className={cn("w-1.5 h-1.5 rounded-full", dataSource === "live" ? "bg-monitoring animate-pulse" : dataSource === "empty" ? "bg-suspicious" : "bg-text-muted")} />
             <span className={cn("text-[11px] font-medium", dataSource === "live" ? "text-monitoring" : dataSource === "empty" ? "text-suspicious" : "text-text-muted")}>
@@ -692,6 +888,7 @@ export function SystemMap() {
             </div>
           )}
           <ReactFlow
+            key={viewMode + (selectedGroupId ?? "")}
             nodes={filteredNodes}
             edges={rfEdges}
             onNodesChange={onNodesChange}
@@ -718,6 +915,14 @@ export function SystemMap() {
             <MiniMap
               position="top-right"
               nodeColor={(n) => {
+                if (n.type === "groupNode") {
+                  const d = n.data as GroupNodeData;
+                  return d.compromised > 0
+                    ? "var(--color-compromised)"
+                    : d.warning > 0
+                      ? "var(--color-suspicious)"
+                      : "var(--color-healthy)";
+                }
                 const d = n.data as ServiceNodeData;
                 return d.status === "compromised"
                   ? "var(--color-compromised)"

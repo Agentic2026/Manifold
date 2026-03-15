@@ -48,6 +48,9 @@ export interface TopologyNode {
   description?: string;
   telemetry?: NodeTelemetry;
   analysis?: NodeAnalysis;
+  groupId?: string;
+  groupKind?: "network" | "compose" | "ungrouped";
+  groupLabel?: string;
 }
 
 export interface TopologyEdge {
@@ -59,9 +62,17 @@ export interface TopologyEdge {
   animated?: boolean;
 }
 
+export interface TopologyGroup {
+  id: string;
+  kind: "network" | "compose" | "ungrouped";
+  label: string;
+  nodeIds: string[];
+}
+
 export interface TopologyData {
   nodes: TopologyNode[];
   edges: TopologyEdge[];
+  groups: TopologyGroup[];
   lastUpdated: string;
   scanStatus: "idle" | "scanning" | "complete";
 }
@@ -122,6 +133,10 @@ export interface SecurityReport {
 const MOCK_TOPOLOGY: TopologyData = {
   scanStatus: "idle",
   lastUpdated: new Date().toISOString(),
+  groups: [
+    { id: "net:frontend", kind: "network", label: "frontend", nodeIds: ["ext-lb", "web-front", "auth-svc"] },
+    { id: "net:backend", kind: "network", label: "backend", nodeIds: ["api-core", "llm-agent", "db-main", "db-vector"] },
+  ],
   nodes: [
     {
       id: "ext-lb",
@@ -130,6 +145,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "gateway",
       position: { x: 60, y: 300 },
+      groupId: "net:frontend",
+      groupKind: "network",
+      groupLabel: "frontend",
       description:
         "Public-facing load balancer. Routes all external traffic to internal services via TLS termination.",
       telemetry: { ingressMbps: 45.2, egressMbps: 38.7, latencyMs: 12, errorRate: 0.01 },
@@ -147,6 +165,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "frontend",
       position: { x: 320, y: 120 },
+      groupId: "net:frontend",
+      groupKind: "network",
+      groupLabel: "frontend",
       description:
         "React SPA served via CDN. Communicates with backend APIs and Auth Service.",
       telemetry: { ingressMbps: 12.4, egressMbps: 8.1, latencyMs: 22, errorRate: 0.02 },
@@ -163,6 +184,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "service",
       position: { x: 620, y: 50 },
+      groupId: "net:frontend",
+      groupKind: "network",
+      groupLabel: "frontend",
       description:
         "Handles authentication and session management. Issues short-lived JWTs.",
       telemetry: { ingressMbps: 3.1, egressMbps: 2.8, latencyMs: 18, errorRate: 0.0 },
@@ -179,6 +203,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "warning",
       type: "api",
       position: { x: 400, y: 320 },
+      groupId: "net:backend",
+      groupKind: "network",
+      groupLabel: "backend",
       description:
         "Node.js backend hub. Routes requests to downstream services and the LLM agent via MCP bridge.",
       telemetry: { ingressMbps: 24.5, egressMbps: 12.4, latencyMs: 67, errorRate: 0.8 },
@@ -204,6 +231,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "compromised",
       type: "agent",
       position: { x: 660, y: 320 },
+      groupId: "net:backend",
+      groupKind: "network",
+      groupLabel: "backend",
       description:
         "LLM-powered context agent with MCP tool access. Reads from Vector Store and returns augmented responses.",
       telemetry: { ingressMbps: 8.2, egressMbps: 31.4, latencyMs: 340, errorRate: 4.2 },
@@ -231,6 +261,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "database",
       position: { x: 840, y: 160 },
+      groupId: "net:backend",
+      groupKind: "network",
+      groupLabel: "backend",
       description:
         "PostgreSQL primary. Stores user records, session data, and application state.",
       telemetry: { ingressMbps: 6.3, egressMbps: 5.9, latencyMs: 4, errorRate: 0.0 },
@@ -248,6 +281,9 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "warning",
       type: "database",
       position: { x: 950, y: 420 },
+      groupId: "net:backend",
+      groupKind: "network",
+      groupLabel: "backend",
       description:
         "Qdrant vector database. Holds document embeddings used by the Context Agent for RAG.",
       telemetry: { ingressMbps: 14.7, egressMbps: 28.3, latencyMs: 11, errorRate: 0.3 },
