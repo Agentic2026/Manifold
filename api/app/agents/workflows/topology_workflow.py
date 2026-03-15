@@ -2,7 +2,7 @@
 
 Uses the same shared schemas and policies as the chat workflow.
 Stages:
-  1. gather_evidence   — fetch topology DAG + telemetry using shared tools
+  1. gather_evidence   — fetch topology DAG + telemetry + detection events
   2. analyze_impact    — LLM analysis with structured output
   3. verify_updates    — verify proposals before persistence
   4. apply_updates     — write verified updates to DB
@@ -39,6 +39,7 @@ from app.models.topology import (
     TopologyNode,
     Vulnerability,
 )
+from app.services.detection import run_detectors
 from app.services.report_generation import generate_reports
 
 logger = logging.getLogger(__name__)
@@ -88,10 +89,24 @@ class LLMImpactAnalysis(BaseModel):
 
 
 async def _fetch_evidence(db: AsyncSession) -> Dict[str, Any]:
-    """Gather structured evidence for topology analysis."""
+    """Gather structured evidence for topology analysis.
+
+    Includes detection-lane outputs so the LLM interprets pre-computed
+    detections rather than re-detecting from raw telemetry.
+    """
     evidence: Dict[str, Any] = {}
 
-    # Telemetry spikes
+    # Detection-lane events (fast lane)
+    try:
+        det_events, det_summaries = await run_detectors(db)
+        evidence["detection_events"] = [e.model_dump() for e in det_events]
+        evidence["detection_summaries"] = [s.model_dump() for s in det_summaries]
+    except Exception as e:
+        logger.error("Failed to run detectors: %s", e)
+        evidence["detection_events"] = []
+        evidence["detection_summaries"] = []
+
+    # Telemetry spikes (legacy — kept for backwards compat)
     try:
         spikes = await get_resource_spikes_structured(300, db)
         anomalies = _spikes_to_anomalies(spikes, 300)
@@ -127,10 +142,25 @@ async def _fetch_evidence(db: AsyncSession) -> Dict[str, Any]:
 
 
 async def _analyze_with_llm(evidence: Dict[str, Any]) -> TopologyAnalysisResult:
-    """Use LLM with structured output and shared policy to analyze evidence."""
+    """Use LLM with structured output and shared policy to analyze evidence.
+
+    The LLM receives pre-computed detection events as authoritative
+    first-pass evidence.  It should interpret, correlate, and explain
+    them — not re-detect from raw telemetry.
+    """
     system_prompt = build_system_prompt(TOPOLOGY_ANALYSIS_OVERLAY)
 
+    det_block = ""
+    if evidence.get("detection_events"):
+        det_block = (
+            f"Detection Events (authoritative first-pass evidence):\n"
+            f"{json.dumps(evidence['detection_events'], indent=1)}\n\n"
+            f"Detection Summaries per Node:\n"
+            f"{json.dumps(evidence.get('detection_summaries', []), indent=1)}\n\n"
+        )
+
     evidence_block = (
+        f"{det_block}"
         f"System DAG Nodes: {json.dumps(evidence.get('nodes', []), indent=1)}\n\n"
         f"System DAG Edges: {json.dumps(evidence.get('edges', []), indent=1)}\n\n"
         f"Telemetry Anomalies: {json.dumps(evidence.get('anomalies', []), indent=1)}\n\n"
@@ -141,6 +171,8 @@ async def _analyze_with_llm(evidence: Dict[str, Any]) -> TopologyAnalysisResult:
         f"{system_prompt}\n\n"
         f"=== EVIDENCE ===\n{evidence_block}\n\n"
         "Analyze the evidence and return structured updates. "
+        "Treat detection events as authoritative first-pass evidence. "
+        "Do not ignore or re-detect them — interpret, correlate, and explain. "
         "Remember: telemetry spikes alone → 'warning', NOT 'compromised'. "
         "Include evidence_refs for every proposed change."
     )
@@ -241,20 +273,27 @@ async def _apply_verified_updates(
 async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
     """Execute the full topology analysis workflow.
 
-    1. Gather evidence (deterministic)
-    2. Analyze with LLM (structured output)
+    1. Gather evidence (deterministic, including detection-lane events)
+    2. Analyze with LLM (structured output, consuming pre-computed detections)
     3. Verify proposals
     4. Apply verified updates
+    5. Generate evidence-grounded reports
     """
     try:
         # 1. Gather evidence
         evidence = await _fetch_evidence(db)
+        det_events = evidence.get("detection_events", [])
+        det_summaries = evidence.get("detection_summaries", [])
 
         if not evidence.get("nodes"):
             logger.info("No topology nodes found — skipping analysis")
             empty_result = {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
             try:
-                await generate_reports(db, empty_result, trigger="manual")
+                await generate_reports(
+                    db, empty_result, trigger="manual",
+                    detection_events=det_events,
+                    detection_summaries=det_summaries,
+                )
                 await db.commit()
             except Exception as re:
                 logger.error("Report generation failed (no nodes): %s", re)
@@ -272,9 +311,13 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
 
         result = verified.model_dump()
 
-        # 5. Generate reports
+        # 5. Generate reports (agent lane — includes detection evidence)
         try:
-            await generate_reports(db, result, trigger="manual")
+            await generate_reports(
+                db, result, trigger="manual",
+                detection_events=det_events,
+                detection_summaries=det_summaries,
+            )
             await db.commit()
         except Exception as re:
             logger.error("Report generation failed: %s", re)

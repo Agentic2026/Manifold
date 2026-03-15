@@ -32,7 +32,26 @@ async def ingest_cadvisor_batch(
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
     processed_count = await process_cadvisor_batch(payload, db)
-    return {"status": "accepted", "samples_processed": processed_count}
+
+    # ── Fast lane: run deterministic detectors immediately ──
+    detection_events = 0
+    nodes_updated = 0
+    try:
+        from app.services.detection import run_detectors, apply_detection_statuses
+
+        events, summaries = await run_detectors(db)
+        detection_events = len(events)
+        nodes_updated = await apply_detection_statuses(db, summaries)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Post-ingest detection failed: %s", exc)
+
+    return {
+        "status": "accepted",
+        "samples_processed": processed_count,
+        "detection_events": detection_events,
+        "nodes_updated": nodes_updated,
+    }
 
 
 @router.get("/ingest/stats")

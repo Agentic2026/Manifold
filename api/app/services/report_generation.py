@@ -18,7 +18,7 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -44,6 +44,8 @@ async def generate_reports(
     scan_result: Dict[str, Any],
     *,
     trigger: str = "manual",
+    detection_events: Optional[List[Dict[str, Any]]] = None,
+    detection_summaries: Optional[List[Dict[str, Any]]] = None,
 ) -> List[SecurityReport]:
     """Generate a deep-scan report and a security-posture report.
 
@@ -56,7 +58,11 @@ async def generate_reports(
         The dict returned by ``run_topology_workflow``.
     trigger:
         How the scan was initiated (``"manual"`` | ``"scheduled"`` |
-        ``"api"``).
+        ``"api"`` | ``"detection"``).
+    detection_events:
+        Structured detection events from the fast lane (optional).
+    detection_summaries:
+        Per-node detection summaries from the fast lane (optional).
 
     Returns
     -------
@@ -113,20 +119,48 @@ async def generate_reports(
     node_updates = scan_result.get("node_updates") or []
     new_vulns = scan_result.get("new_vulnerabilities") or []
     new_insights = scan_result.get("new_insights") or []
+    det_events = detection_events or []
+    det_summaries = detection_summaries or []
 
-    has_material_change = bool(node_updates or new_vulns or new_insights)
+    has_material_change = bool(
+        node_updates or new_vulns or new_insights or det_events
+    )
 
     # ── Deep-scan report ────────────────────────────────────
     deep_fp_data = {
         "node_updates": node_updates,
         "new_vulnerabilities": new_vulns,
         "new_insights": new_insights,
+        "detection_event_ids": [e.get("id", "") for e in det_events],
     }
     deep_fingerprint = _fingerprint(deep_fp_data)
 
     if has_material_change:
         deep_title = "Deep Scan Report"
         lines: List[str] = []
+
+        if det_events:
+            lines.append("## Detection Events\n")
+            for de in det_events:
+                lines.append(
+                    f"- **{de.get('title', 'Unnamed')}** "
+                    f"(kind: `{de.get('kind', '?')}`, "
+                    f"severity: `{de.get('severity', '?')}`, "
+                    f"node: `{de.get('node_id', '?')}`)"
+                )
+            lines.append("")
+
+        if det_summaries:
+            lines.append("## Detection Summaries\n")
+            for ds in det_summaries:
+                lines.append(
+                    f"- **{ds.get('node_id', '?')}**: "
+                    f"{ds.get('detection_count', 0)} detection(s), "
+                    f"max severity `{ds.get('max_severity', '?')}`, "
+                    f"recommended status `{ds.get('recommended_status', '?')}`"
+                )
+            lines.append("")
+
         if node_updates:
             lines.append("## Node Status Changes\n")
             for u in node_updates:
@@ -158,6 +192,7 @@ async def generate_reports(
 
         deep_details = "\n".join(lines)
         deep_summary = (
+            f"{len(det_events)} detection(s), "
             f"{len(node_updates)} status change(s), "
             f"{len(new_vulns)} vulnerability(ies), "
             f"{len(new_insights)} insight(s)"
@@ -181,6 +216,11 @@ async def generate_reports(
         fingerprint=deep_fingerprint,
         trigger=trigger,
         payload={
+            "detection_event_count": len(det_events),
+            "detection_event_ids": [e.get("id", "") for e in det_events],
+            "affected_node_ids": list(set(
+                e.get("node_id") for e in det_events if e.get("node_id")
+            )),
             "node_updates_count": len(node_updates),
             "new_vulnerabilities_count": len(new_vulns),
             "new_insights_count": len(new_insights),

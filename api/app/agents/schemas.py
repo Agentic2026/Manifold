@@ -146,3 +146,57 @@ class TopologyAnalysisResult(BaseModel):
     node_updates: List[NodeStatusUpdate] = Field(default_factory=list)
     new_vulnerabilities: List[ProposedVulnerability] = Field(default_factory=list)
     new_insights: List[ProposedInsight] = Field(default_factory=list)
+
+
+# ── Deterministic detection lane ─────────────────────────────
+
+
+class DetectionEvidenceRef(BaseModel):
+    """A reference to a piece of supporting evidence for a detection."""
+
+    ref_type: str = Field(description="'metric_snapshot', 'anomaly', 'container'")
+    ref_id: str = Field(description="Identifier for the referenced evidence")
+    description: str = Field(default="", description="Human-readable description")
+
+
+class DetectionEvent(BaseModel):
+    """Structured output from a deterministic detector."""
+
+    id: str = Field(description="Unique detection event ID")
+    kind: str = Field(
+        description=(
+            "'cpu_abuse', 'memory_staging', 'egress_burst', 'beaconing', "
+            "'filesystem_churn', 'multi_signal_correlation'"
+        )
+    )
+    node_id: Optional[str] = Field(default=None, description="Topology node ID")
+    container_id: Optional[str] = Field(
+        default=None, description="Container reference name"
+    )
+    severity: str = Field(
+        default="info", description="'info', 'warning', 'critical'"
+    )
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    title: str = Field(description="Short human-readable title")
+    summary: str = Field(description="Brief description of what was detected")
+    details: Optional[str] = Field(
+        default=None, description="Extended details"
+    )
+    metrics: dict = Field(default_factory=dict, description="Supporting metrics")
+    detected_at: str = Field(description="ISO timestamp of detection")
+    lookback_seconds: int = Field(description="Lookback window used by the detector")
+    evidence_refs: List[DetectionEvidenceRef] = Field(default_factory=list)
+
+
+class NodeDetectionSummary(BaseModel):
+    """Aggregated detection summary for a single topology node."""
+
+    node_id: str
+    max_severity: str = Field(default="info", description="'info', 'warning', 'critical'")
+    detection_count: int = 0
+    detection_kinds: List[str] = Field(default_factory=list)
+    events: List[DetectionEvent] = Field(default_factory=list)
+    recommended_status: str = Field(
+        default="healthy",
+        description="Suggested topology status based on detections",
+    )
