@@ -6,9 +6,12 @@ import {
   TrendingUp,
   Clock,
   ChevronRight,
+  FileText,
+  Shield,
 } from "lucide-react";
-import { manifoldApi, type LLMInsight, type InsightType } from "../api/manifold";
+import { manifoldApi, type LLMInsight, type InsightType, type SecurityReport } from "../api/manifold";
 import { cn } from "../lib/utils";
+import { AssistantMarkdown } from "../components/chat/AssistantMarkdown";
 
 const TYPE_CONFIG: Record<
   InsightType,
@@ -89,9 +92,75 @@ function InsightCard({ insight }: { insight: LLMInsight }) {
 
       {expanded && (
         <div className="px-4 pb-4 border-t border-border">
-          <p className="text-xs text-text-muted leading-relaxed pt-3">
-            {insight.details}
-          </p>
+          <div className="text-xs text-text-muted leading-relaxed pt-3">
+            <AssistantMarkdown markdown={insight.details} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  healthy: "bg-healthy/10 text-healthy border border-healthy/20",
+  warning: "bg-suspicious/10 text-suspicious border border-suspicious/20",
+  compromised: "bg-compromised/10 text-compromised border border-compromised/20",
+};
+
+function ReportCard({ report }: { report: SecurityReport }) {
+  const [expanded, setExpanded] = useState(false);
+  const ts = new Date(report.createdAt);
+  const isPosture = report.reportKind === "security_posture";
+  const Icon = isPosture ? Shield : FileText;
+  const kindLabel = isPosture ? "Security Posture" : "Deep Scan";
+
+  return (
+    <div className="bg-surface-raised border border-border rounded-xl overflow-hidden">
+      <button
+        className="w-full text-left p-4"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0 mt-0.5">
+            <Icon className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-primary/10 text-primary border border-primary/20">
+                {kindLabel}
+              </span>
+              {report.maxStatus && (
+                <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold", STATUS_BADGE[report.maxStatus] ?? STATUS_BADGE.healthy)}>
+                  {report.maxStatus}
+                </span>
+              )}
+              {isPosture && report.payload?.score != null && (
+                <span className="text-[10px] font-mono text-text-muted">
+                  Score: {report.payload.score}
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-semibold text-text mb-1">{report.title}</p>
+            <p className="text-xs text-text-muted mb-1">{report.summary}</p>
+            <div className="flex items-center gap-1 text-[10px] text-text-muted">
+              <Clock className="w-2.5 h-2.5" />
+              {ts.toLocaleTimeString()} · {ts.toLocaleDateString()}
+            </div>
+          </div>
+          <ChevronRight
+            className={cn(
+              "w-4 h-4 text-text-muted flex-shrink-0 transition-transform mt-1",
+              expanded && "rotate-90",
+            )}
+          />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-border">
+          <div className="text-xs text-text-muted leading-relaxed pt-3">
+            <AssistantMarkdown markdown={report.detailsMarkdown} />
+          </div>
         </div>
       )}
     </div>
@@ -100,10 +169,12 @@ function InsightCard({ insight }: { insight: LLMInsight }) {
 
 export function LLMInsights() {
   const [insights, setInsights] = useState<LLMInsight[]>([]);
+  const [reports, setReports] = useState<SecurityReport[]>([]);
   const [filter, setFilter] = useState<InsightType | "all">("all");
 
   useEffect(() => {
     manifoldApi.getInsights().then(setInsights);
+    manifoldApi.getReports().then(setReports);
   }, []);
 
   const filtered =
@@ -157,8 +228,25 @@ export function LLMInsights() {
             })}
           </div>
 
+          {/* Reports section */}
+          {reports.length > 0 && filter === "all" && (
+            <div className="space-y-3">
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+                Reports
+              </h2>
+              {reports.map((report) => (
+                <ReportCard key={report.id} report={report} />
+              ))}
+            </div>
+          )}
+
           {/* Insights list */}
           <div className="space-y-3">
+            {filter === "all" && reports.length > 0 && (
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+                Insights
+              </h2>
+            )}
             {filtered.length === 0 ? (
               <div className="text-center py-12 text-text-muted text-sm">
                 No insights to display.
