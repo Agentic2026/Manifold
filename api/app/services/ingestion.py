@@ -12,14 +12,20 @@ def _resolve_topology_node_id(sample) -> str | None:
     """Deterministically resolve a topology node id from container metadata.
 
     Priority:
-    1. ``com.docker.compose.service`` label  (set by Docker Compose)
-    2. First alias that is not the reference name
-    3. ``None`` – container stays unmatched
+    1. ``com.docker.compose.project`` + ``com.docker.compose.service`` labels
+       → ``<project>__<service>`` (project-scoped, avoids collisions)
+    2. ``com.docker.compose.service`` label only → bare service name
+    3. First alias that is not the reference name
+    4. ``None`` – container stays unmatched
     """
     spec = sample.container_spec or {}
     labels = spec.get("labels") or {}
 
     compose_svc = labels.get("com.docker.compose.service")
+    compose_project = labels.get("com.docker.compose.project")
+
+    if compose_svc and compose_project:
+        return f"{compose_project}__{compose_svc}"
     if compose_svc:
         return compose_svc
 
