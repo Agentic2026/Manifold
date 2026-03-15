@@ -29,7 +29,6 @@ services:
     image: ${MANIFOLD_IMAGE:-ghcr.io/agentic2026/manifold:latest}
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_REDIS_URL: redis://redis:6379
       H4CKATH0N_ORIGIN: ${H4CKATH0N_ORIGIN:-http://localhost:${WEB_PORT:-8080}}
@@ -48,7 +47,6 @@ services:
     command: ["uv", "run", "python", "-m", "h4ckath0n", "jobs", "worker"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_REDIS_URL: redis://redis:6379
     volumes:

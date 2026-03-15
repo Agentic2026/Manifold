@@ -289,8 +289,7 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WEB_PORT` | `8080` | Public port for the Caddy web container |
-| `DATABASE_URL` | `postgresql+asyncpg://…` | Async DB URL for telemetry/topology |
-| `H4CKATH0N_DATABASE_URL` | `postgresql+psycopg://…` | DB URL for auth framework |
+| `H4CKATH0N_DATABASE_URL` | `postgresql+psycopg://…` | Canonical DB URL (psycopg). The async `asyncpg` URL is derived from this automatically. |
 | `H4CKATH0N_ORIGIN` | `http://localhost:8080` | Public origin for CORS/auth |
 | `OPENAI_API_KEY` | — | OpenAI key (optional, for LLM features) |
 | `CADVISOR_METRICS_API_TOKEN` | `my-secret-token` | Bearer token for ingestion |
