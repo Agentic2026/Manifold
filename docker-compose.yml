@@ -1,12 +1,19 @@
+# ── Manifold – Docker Compose ───────────────────────────────
+# Image-based deployment: uses pre-built GHCR images by default.
+# Only the web (Caddy) service exposes a public port.
+#
+# To use locally-built images instead, override:
+#   MANIFOLD_IMAGE=manifold-api:local
+#   MANIFOLD_WEB_IMAGE=manifold-web:local
+# ────────────────────────────────────────────────────────────
+
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: manifold
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,19 +22,18 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:8-alpine
+
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: api
-    ports:
-      - "8000:8000"
+    image: ${MANIFOLD_IMAGE:-ghcr.io/agentic2026/manifold:latest}
     env_file: .env
     environment:
-      # Override for Docker networking (db hostname instead of localhost)
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/manifold
-      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/manifold
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
+      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_REDIS_URL: redis://redis:6379
+      H4CKATH0N_ORIGIN: ${H4CKATH0N_ORIGIN:-http://localhost:${WEB_PORT:-8080}}
+      H4CKATH0N_APP_BASE_URL: ${H4CKATH0N_APP_BASE_URL:-http://localhost:${WEB_PORT:-8080}}
     volumes:
       - uploads:/app/.h4ckath0n_storage
       - email_outbox:/app/.h4ckath0n_email_outbox
@@ -38,15 +44,12 @@ services:
         condition: service_started
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: api
+    image: ${MANIFOLD_IMAGE:-ghcr.io/agentic2026/manifold:latest}
     command: ["uv", "run", "python", "-m", "h4ckath0n", "jobs", "worker"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/manifold
-      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/manifold
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
+      H4CKATH0N_DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/manifold
       H4CKATH0N_REDIS_URL: redis://redis:6379
     volumes:
       - uploads:/app/.h4ckath0n_storage
@@ -56,17 +59,15 @@ services:
       redis:
         condition: service_started
 
-  redis:
-    image: redis:8-alpine
-    ports:
-      - "6379:6379"
-
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: ${MANIFOLD_WEB_IMAGE:-ghcr.io/agentic2026/manifold-web:latest}
     ports:
-      - "5173:80"
+      - "${WEB_PORT:-8080}:8080"
+    environment:
+      BACKEND_URL: api:8000
+      WEB_PORT: "8080"
+    depends_on:
+      - api
 
   cadvisor:
     image: ghcr.io/agentic2026/cadvisor:latest
@@ -84,8 +85,6 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     privileged: true
-    ports:
-      - "8080:8080"
     depends_on:
       - api
 

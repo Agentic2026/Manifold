@@ -1,3 +1,9 @@
+# ── DEPRECATED ──────────────────────────────────────────────
+# This root Dockerfile is kept for backward compatibility only.
+# Use api/Dockerfile for the backend image and web/Dockerfile
+# for the Caddy frontend image.
+# ────────────────────────────────────────────────────────────
+
 FROM python:3.14-slim AS api
 
 WORKDIR /app
