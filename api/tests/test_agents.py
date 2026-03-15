@@ -13,22 +13,19 @@ Covers:
 
 import json
 import pytest
-from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch
 
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
-from app.core.database import get_db_session, Base
 from app.models.topology import TopologyNode, TopologyEdge
 
 # ── Reuse test engine from test_topology (same in-memory SQLite) ────
 # The JSONB→JSON compiler hooks are already registered by test_topology.
 # We import the same engine/session so app dependency override is shared.
 
-from tests.test_topology import test_engine, TestSessionLocal, _reset_tables
+from tests.test_topology import TestSessionLocal, _reset_tables
 
 VALID_TOKEN = "test-secret-123"
 

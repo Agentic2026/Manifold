@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import json
 import logging
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect

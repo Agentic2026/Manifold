@@ -1,13 +1,12 @@
 from datetime import UTC, datetime, timedelta
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import yaml
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete, func
 
 from app.core.database import get_db_session
 from app.models.topology import (

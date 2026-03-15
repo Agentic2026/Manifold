@@ -6,10 +6,9 @@ by both the chat and topology workflows.
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from app.agents.schemas import (
     NodeStatusUpdate,

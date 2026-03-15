@@ -1,5 +1,4 @@
 import pytest
-import sqlite3
 from datetime import datetime, timezone
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession

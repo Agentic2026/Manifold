@@ -30,7 +30,6 @@ from app.agents.schemas import (
     TopologyAnalysisResult,
 )
 from app.agents.tools.security_snapshot import (
-    get_system_overview,
     _spikes_to_anomalies,
 )
 from app.agents.tools.telemetry import get_resource_spikes_structured

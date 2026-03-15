@@ -15,7 +15,6 @@ import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +30,6 @@ from app.agents.runtime import (
     store_message,
     verify_chat_answer,
 )
-from app.agents.schemas import NodeEvidence, SystemEvidence
 from app.agents.tools.security_snapshot import (
     get_recent_findings,
     get_remediation_candidates,
@@ -39,7 +37,6 @@ from app.agents.tools.security_snapshot import (
     get_system_overview,
     get_topology_subgraph,
 )
-from app.agents.tools.telemetry import get_resource_spikes_impl
 
 logger = logging.getLogger(__name__)
 

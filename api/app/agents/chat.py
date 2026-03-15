@@ -4,7 +4,6 @@ Public API is preserved: ``stream_agent_response`` returns an async
 generator of SSE-compatible dicts.
 """
 
-import json
 import logging
 from typing import AsyncGenerator, Dict, Any, List, Optional
 
