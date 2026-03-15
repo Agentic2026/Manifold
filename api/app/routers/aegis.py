@@ -12,6 +12,7 @@ from app.core.database import get_db_session
 from app.models.topology import TopologyNode as DBNode, TopologyEdge as DBEdge, Vulnerability as DBVuln, LLMInsight as DBInsight, RBACPolicy as DBRBAC
 from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
+from app.services.discovery import reconcile_topology_from_containers
 
 router = APIRouter(prefix="/api", tags=["aegis"])
 
@@ -506,17 +507,16 @@ async def import_topology(
     body: ComposeImportRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    """Import topology from a Docker Compose YAML document.
+    """(Optional) Import topology from a Docker Compose YAML document.
+
+    This endpoint is **not required** for normal operation.  Manifold
+    auto-discovers topology from live cAdvisor runtime metadata.  Use
+    this endpoint only as a fallback, enrichment tool, or for
+    previewing topology before containers are running.
 
     Parses services, depends_on, and shared networks to create topology
-    nodes and edges.  Existing nodes/edges are deleted first so each import
+    nodes and edges.  Existing nodes/edges are replaced so each import
     is idempotent.
-
-    Example payload::
-
-        {
-            "yaml_content": "<raw docker-compose YAML>"
-        }
     """
     node_dicts, edge_dicts = _parse_compose_to_topology(body.yaml_content)
 
@@ -539,6 +539,11 @@ async def import_topology(
 
 @router.get("/topology", response_model=TopologyData)
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
+    # If topology is empty, attempt lazy reconciliation from live containers
+    check = await db.execute(select(DBNode.id).limit(1))
+    if check.scalar_one_or_none() is None:
+        await reconcile_topology_from_containers(db)
+
     nodes_q = await db.execute(select(DBNode))
     edges_q = await db.execute(select(DBEdge))
     
