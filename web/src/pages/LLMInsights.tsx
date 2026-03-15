@@ -136,7 +136,7 @@ function ReportCard({ report }: { report: SecurityReport }) {
               )}
               {isPosture && report.payload?.score != null && (
                 <span className="text-[10px] font-mono text-text-muted">
-                  Score: {report.payload.score}
+                  Score: {report.payload.score as number}
                 </span>
               )}
             </div>
