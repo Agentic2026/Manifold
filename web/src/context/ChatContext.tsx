@@ -36,7 +36,10 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 let msgId = 0;
 
-// Mock responses keyed by context
+// Dev/demo fallback: only enabled when VITE_ENABLE_MOCK_CHAT is explicitly "true"
+const MOCK_ENABLED = import.meta.env.VITE_ENABLE_MOCK_CHAT === "true";
+
+// Mock responses keyed by context — only used when MOCK_ENABLED
 const MOCK_RESPONSES: Record<string, string> = {
   default:
     "**Security Analysis Complete**\n\nBased on the current system topology, I've identified the following:\n\n1. **Active Threat**: The Context Agent (LLM-AGENT) shows signs of prompt injection compromise. Egress traffic is 3.8x above baseline.\n\n2. **Lateral Movement Risk**: The compromised agent has active MCP bridge access to the Core API Hub, creating a potential exfiltration channel.\n\n3. **Recommended Actions**:\n   - Isolate the Context Agent immediately\n   - Revoke `vector_read_role` and `mcp_bridge_role`\n   - Audit all tool call logs from the last 6 hours\n   - Deploy input sanitization middleware before restoring service",
@@ -47,6 +50,15 @@ const MOCK_RESPONSES: Record<string, string> = {
   healthy:
     "**Node Status: Healthy**\n\nThis entity is operating within normal parameters.\n\n- All telemetry metrics within expected ranges\n- No anomalous traffic patterns detected\n- RBAC policies are correctly scoped\n\nNo immediate action required. Consider scheduling routine credential rotation.",
 };
+
+// Stable thread ID per browser session for conversation continuity
+let _threadId: string | null = null;
+function getThreadId(): string {
+  if (!_threadId) {
+    _threadId = `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  return _threadId;
+}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -77,7 +89,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      // Try real endpoint, fall back to mock
+      // Build recent history for the backend (last 10 messages)
+      const recentHistory = [...messages, userMsg]
+        .slice(-10)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      // Try real endpoint; only fall back to mock in dev/demo mode
       const streamReal = async () => {
         try {
           await fetchEventSource(`${API_BASE}/llm/chat/stream`, {
@@ -92,6 +109,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                     status: nodeContext.status,
                   }
                 : undefined,
+              thread_id: getThreadId(),
+              history: recentHistory,
             }),
             signal: ctrl.signal,
             openWhenHidden: true,
@@ -115,15 +134,47 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setIsStreaming(false);
             },
             onerror() {
-              // Fall back to mock
-              simulateMock(assistantId);
+              if (MOCK_ENABLED) {
+                simulateMock(assistantId);
+              } else {
+                // Production: surface the error
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          content:
+                            m.content +
+                            "\n\n**Error:** Unable to reach the AI backend. Please try again later.",
+                        }
+                      : m,
+                  ),
+                );
+                setIsStreaming(false);
+              }
               throw new Error("stop"); // stop retry
             },
           });
         } catch {
-          // If fetch itself fails, simulate mock
+          // If fetch itself fails
           if (!ctrl.signal.aborted) {
-            simulateMock(assistantId);
+            if (MOCK_ENABLED) {
+              simulateMock(assistantId);
+            } else {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        content:
+                          m.content +
+                          "\n\n**Error:** Unable to reach the AI backend. Please try again later.",
+                      }
+                    : m,
+                ),
+              );
+              setIsStreaming(false);
+            }
           }
         }
       };
@@ -153,13 +204,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       void streamReal();
     },
-    [nodeContext],
+    [nodeContext, messages],
   );
 
   const clearHistory = useCallback(() => {
     abortRef.current?.abort();
     setMessages([]);
     setIsStreaming(false);
+    // Reset thread ID so next conversation starts fresh
+    _threadId = null;
   }, []);
 
   return (

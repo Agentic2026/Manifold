@@ -45,17 +45,26 @@ def get_jobs(user: Any = Depends(require_user)) -> List[JobItem]:
 class ChatRequest(BaseModel):
     message: str
     context: Optional[dict] = None
+    thread_id: Optional[str] = None
+    history: Optional[list] = None
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db_session
 from app.agents.chat import stream_agent_response
 
+import logging as _logging
+_dashboard_logger = _logging.getLogger(__name__)
+
 @router.post("/llm/chat/stream")
 async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_session)) -> Any:
     """Stream an AI security analysis response via SSE.
 
-    Accepts JSON body: {"message": str, "context"?: {"nodeId": str, "nodeName": str, "status": str}}
+    Accepts JSON body:
+      - message: str
+      - context?: {nodeId, nodeName, status}
+      - thread_id?: str  (for conversation continuity)
+      - history?: [{role, content}, ...]  (recent messages)
     Returns SSE events with {"token": str} data.
     """
     # Auth is optional for the chat endpoint during hackathon demo
@@ -68,22 +77,27 @@ async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_sessio
         body = await request.json()
         user_msg = body.get("message", "")
         context = body.get("context")
+        thread_id = body.get("thread_id", "default")
+        history = body.get("history")
     except Exception:
         user_msg = ""
         context = None
-
-    import logging
-    logger = logging.getLogger(__name__)
+        thread_id = "default"
+        history = None
 
     # Async wrapper to ensure we catch disconnects
     async def generate_response():
         try:
-            async for sse_dict in stream_agent_response(user_msg, context, db):
+            async for sse_dict in stream_agent_response(
+                user_msg, context, db,
+                thread_id=thread_id,
+                history=history,
+            ):
                 if await request.is_disconnected():
                     break
                 yield sse_dict
         except Exception as e:
-            logger.error(f"SSE stream failed: {e}")
+            _dashboard_logger.error(f"SSE stream failed: {e}")
             yield {
                 "event": "message",
                 "data": json.dumps({"token": "\\n\\n**Connection Error:** Stream interrupted."})
