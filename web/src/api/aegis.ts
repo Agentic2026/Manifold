@@ -588,7 +588,26 @@ export const aegisApi = {
     }
   },
 
-  /** Compute an aggregate security posture score from all data sources. */
+  /** Fetch security score from the live backend. */
+  getSecurityScore: async (): Promise<{
+    score: number;
+    breakdown: { label: string; impact: number }[];
+  }> => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/security-score`, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return (await res.json()) as { score: number; breakdown: { label: string; impact: number }[] };
+    } catch {
+      return { score: 100, breakdown: [] };
+    }
+  },
+
+  /**
+   * Compute an aggregate security posture score from all data sources.
+   * @deprecated Use getSecurityScore() which fetches from the backend.
+   */
   computeSecurityScore: async (): Promise<{
     score: number;
     breakdown: { label: string; impact: number }[];
@@ -602,8 +621,9 @@ export const aegisApi = {
     const breakdown: { label: string; impact: number }[] = [];
     let score = 100;
 
-    const compromised = topology.nodes.filter((n) => n.status === "compromised").length;
-    const warning = topology.nodes.filter((n) => n.status === "warning").length;
+    const nodes = topology?.nodes ?? [];
+    const compromised = nodes.filter((n) => n.status === "compromised").length;
+    const warning = nodes.filter((n) => n.status === "warning").length;
     if (compromised > 0) {
       const impact = -20 * compromised;
       breakdown.push({ label: `${compromised} compromised node${compromised > 1 ? "s" : ""}`, impact });

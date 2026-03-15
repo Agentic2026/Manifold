@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink, useNavigate } from "react-router";
 import {
   Shield,
   Network,
@@ -10,8 +10,9 @@ import {
   Sun,
   Moon,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   applyEffectiveThemeForPreference,
   applyThemePreference,
@@ -27,6 +28,7 @@ import { ChatProvider } from "../context/ChatContext";
 import { AIChatPanel } from "./AIChatPanel";
 import { SecurityGauge } from "./SecurityGauge";
 import { aegisApi } from "../api/aegis";
+import { useAuth } from "../auth";
 
 const NAV_ITEMS = [
   { href: "/",                label: "System Map",      icon: Network       },
@@ -82,8 +84,25 @@ export function AegisLayout() {
     breakdown: { label: string; impact: number }[];
   } | null>(null);
 
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate("/");
+  }, [logout, navigate]);
+
+  // Fetch security score from backend on mount and periodically
   useEffect(() => {
-    aegisApi.computeSecurityScore().then(setSecurityScore);
+    const fetchScore = () => {
+      aegisApi.getSecurityScore().then(setSecurityScore).catch(() => {});
+    };
+    const timer = setTimeout(fetchScore, 0);
+    const interval = setInterval(fetchScore, 15_000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
   const effectiveTheme: "light" | "dark" =
     themePreference === "system"
@@ -214,12 +233,20 @@ export function AegisLayout() {
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-border flex-shrink-0">
+        <div className="px-2 py-3 border-t border-border flex-shrink-0 space-y-0.5">
           <ThemeToggle
             preference={themePreference}
             effectiveTheme={effectiveTheme}
             onCycle={cycleTheme}
           />
+          <button
+            onClick={() => void handleLogout()}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-text-muted hover:bg-surface hover:text-text transition-colors"
+            data-testid="nav-logout"
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 text-left">Logout</span>
+          </button>
           <p className="px-3 pt-2 text-[10px] text-text-muted/60">
             v0.1.0 · hackathon build
           </p>

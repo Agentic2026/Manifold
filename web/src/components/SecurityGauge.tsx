@@ -8,12 +8,10 @@ interface SecurityGaugeProps {
 
 export function SecurityGauge({ score, breakdown }: SecurityGaugeProps) {
   const [displayScore, setDisplayScore] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const rafRef = useRef<number>(0);
 
-  // Animate score count-up
+  // Animate score count-up via rAF callback (no synchronous setState in effect body)
   useEffect(() => {
-    setMounted(true);
     const start = performance.now();
     const duration = 1200;
     const from = 0;
@@ -72,7 +70,7 @@ export function SecurityGauge({ score, breakdown }: SecurityGaugeProps) {
             strokeWidth="7"
             strokeLinecap="round"
             strokeDasharray={circumference}
-            strokeDashoffset={mounted ? offset : circumference}
+            strokeDashoffset={offset}
             style={{ transition: "stroke-dashoffset 1.2s ease-out, stroke 0.5s ease" }}
           />
         </svg>

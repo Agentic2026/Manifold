@@ -531,17 +531,14 @@ export function SystemMap() {
     }
   }, [loadTopology]);
 
-  // Initial load
+  // Initial load + periodic live refresh every 12 seconds
   useEffect(() => {
-    fetchTopology();
-  }, [fetchTopology]);
-
-  // Periodic live refresh every 12 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchTopology();
-    }, 12_000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(fetchTopology, 0);
+    const interval = setInterval(fetchTopology, 12_000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchTopology]);
 
   const handleDeepScan = async () => {
