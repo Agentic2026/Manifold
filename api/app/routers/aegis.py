@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -13,6 +14,8 @@ from app.models.topology import TopologyNode as DBNode, TopologyEdge as DBEdge, 
 from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
 from app.services.discovery import reconcile_topology_from_containers
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["aegis"])
 
@@ -328,19 +331,15 @@ def _parse_compose_to_topology(
     return nodes, edges
 
 
-def _bytes_to_mbps(byte_count: float, interval_seconds: float = 15.0) -> float:
-    """Convert a byte count over an interval to Mbps (megabits per second)."""
-    if interval_seconds <= 0:
-        return 0.0
-    return round((byte_count * 8) / (interval_seconds * 1_000_000), 3)
-
-
 async def _aggregate_node_telemetry(
     node_id: str,
     db: AsyncSession,
-    lookback_seconds: int = 60,
+    lookback_seconds: int = 300,
 ) -> Optional[NodeTelemetry]:
     """Aggregate recent network telemetry for containers mapped to *node_id*.
+
+    Computes network throughput from **deltas** between the two most recent
+    snapshots per container (not from cumulative counters directly).
 
     Returns ``None`` when no snapshots exist for the node in the lookback
     window (or no containers are mapped at all).
@@ -355,47 +354,64 @@ async def _aggregate_node_telemetry(
     if not container_ids:
         return None
 
-    # Latest snapshot per container within the lookback window
+    # All snapshots within the lookback window, ordered by container + time
     snapshots_q = await db.execute(
         select(ContainerMetricSnapshot)
         .where(
             ContainerMetricSnapshot.container_id.in_(container_ids),
             ContainerMetricSnapshot.timestamp >= cutoff,
         )
-        .order_by(ContainerMetricSnapshot.timestamp.desc())
+        .order_by(ContainerMetricSnapshot.container_id, ContainerMetricSnapshot.timestamp.desc())
     )
     snapshots = snapshots_q.scalars().all()
     if not snapshots:
         return None
 
-    # Use the most recent snapshot per container for throughput calculation
-    seen_containers: set[int] = set()
-    total_rx_bytes = 0.0
-    total_tx_bytes = 0.0
-    latest_ts: Optional[datetime] = None
-
-    for snap in snapshots:
-        # Only take the latest snapshot per container
-        if snap.container_id in seen_containers:
-            continue
-        seen_containers.add(snap.container_id)
-
+    def _net_bytes(snap: ContainerMetricSnapshot) -> tuple[float, float]:
+        """Extract (rx_bytes, tx_bytes) from a snapshot's network_stats."""
         net = snap.network_stats
+        rx, tx = 0.0, 0.0
         if net and isinstance(net, dict):
-            # cAdvisor network stats may be a dict of interfaces or a flat dict
             if "interfaces" in net:
                 for iface in net["interfaces"]:
-                    total_rx_bytes += iface.get("rx_bytes", 0)
-                    total_tx_bytes += iface.get("tx_bytes", 0)
+                    rx += iface.get("rx_bytes", 0)
+                    tx += iface.get("tx_bytes", 0)
             else:
-                total_rx_bytes += net.get("rx_bytes", 0)
-                total_tx_bytes += net.get("tx_bytes", 0)
+                rx += net.get("rx_bytes", 0)
+                tx += net.get("tx_bytes", 0)
+        return rx, tx
 
-        if latest_ts is None or snap.timestamp > latest_ts:
-            latest_ts = snap.timestamp
+    # Group by container_id → find the two most recent snapshots for delta
+    from collections import defaultdict
+    per_container: dict[int, list] = defaultdict(list)
+    for snap in snapshots:
+        per_container[snap.container_id].append(snap)
 
-    ingress = _bytes_to_mbps(total_rx_bytes)
-    egress = _bytes_to_mbps(total_tx_bytes)
+    total_rx_rate = 0.0  # bytes/sec
+    total_tx_rate = 0.0  # bytes/sec
+    latest_ts: Optional[datetime] = None
+
+    for cid, snaps in per_container.items():
+        # snaps are ordered desc by timestamp
+        if latest_ts is None or snaps[0].timestamp > latest_ts:
+            latest_ts = snaps[0].timestamp
+
+        if len(snaps) >= 2:
+            newer = snaps[0]
+            older = snaps[1]
+
+            rx_new, tx_new = _net_bytes(newer)
+            rx_old, tx_old = _net_bytes(older)
+
+            elapsed = (newer.timestamp - older.timestamp).total_seconds()
+            if elapsed > 0:
+                total_rx_rate += max(0, rx_new - rx_old) / elapsed
+                total_tx_rate += max(0, tx_new - tx_old) / elapsed
+        # If only one snapshot, we can't compute a rate — skip
+
+    # Convert bytes/sec → Mbps
+    ingress = round((total_rx_rate * 8) / 1_000_000, 3)
+    egress = round((total_tx_rate * 8) / 1_000_000, 3)
 
     return NodeTelemetry(
         ingressMbps=ingress,
@@ -447,14 +463,31 @@ def _compute_node_status(
     return "healthy"
 
 
+async def _compute_effective_node_statuses(
+    db: AsyncSession,
+) -> List[tuple]:
+    """Return (node, effective_status, telemetry) for every topology node.
+
+    This is the **single source of truth** for effective node status used
+    by both ``GET /topology`` and ``GET /security-score``.
+    """
+    nodes_q = await db.execute(select(DBNode))
+    results = []
+    for n in nodes_q.scalars().all():
+        telem = await _aggregate_node_telemetry(n.id, db)
+        effective = _compute_node_status(n.status, telem)
+        results.append((n, effective, telem))
+    return results
+
+
 async def _compute_security_score(db: AsyncSession) -> SecurityScore:
     score = 100
     breakdown = []
 
-    nodes_q = await db.execute(select(DBNode))
-    nodes = nodes_q.scalars().all()
-    compromised = sum(1 for n in nodes if n.status == "compromised")
-    warning = sum(1 for n in nodes if n.status == "warning")
+    # Use effective (telemetry-aware) statuses — same logic as /topology
+    node_statuses = await _compute_effective_node_statuses(db)
+    compromised = sum(1 for _, s, _ in node_statuses if s == "compromised")
+    warning = sum(1 for _, s, _ in node_statuses if s == "warning")
     if compromised:
         impact = -20 * compromised
         breakdown.append({"label": f"{compromised} compromised node{'s' if compromised > 1 else ''}", "impact": impact})
@@ -582,17 +615,13 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
             await reconcile_topology_from_containers(db)
         _last_reconcile_ts = now
 
-    nodes_q = await db.execute(select(DBNode))
+    nodes_q_check = await db.execute(select(DBNode.id).limit(1))
+    # We already fetched nodes check above; now use the shared helper
+    node_statuses = await _compute_effective_node_statuses(db)
     edges_q = await db.execute(select(DBEdge))
     
     nodes = []
-    for n in nodes_q.scalars().all():
-        # Aggregate real telemetry for this node
-        telem = await _aggregate_node_telemetry(n.id, db)
-
-        # Deterministic status engine
-        status = _compute_node_status(n.status, telem)
-
+    for n, status, telem in node_statuses:
         nodes.append(TopologyNode(
             id=n.id, label=n.label, serviceId=n.service_id, status=status, type=n.type,
             position=n.position, description=n.description,
@@ -616,8 +645,17 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
 
 @router.post("/topology/scan", response_model=TopologyData)
 async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
-    # Trigger the background LangGraph DAG topology agent
-    analysis_update = await run_topology_analysis(db)
+    # Trigger the background LangGraph DAG topology agent.
+    # Failures here must not prevent returning the topology graph.
+    try:
+        analysis_update = await run_topology_analysis(db)
+    except Exception as exc:
+        logger.error("Topology analysis failed during scan: %s", exc)
+        # Ensure the session is clean for the subsequent topology fetch
+        try:
+            await db.rollback()
+        except Exception:
+            pass
     
     # Return topology with scanning status true (frontend usually polls afterward)
     topo = await get_topology(db)

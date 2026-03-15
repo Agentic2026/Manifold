@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.models.topology import TopologyNode, TopologyEdge, Vulnerability, LLMInsight
-from app.agents.tools.telemetry import get_resource_spikes_impl
+from app.agents.tools.telemetry import get_resource_spikes_impl, get_resource_spikes_structured
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +56,17 @@ async def fetch_telemetry_and_dag(state: TopologyState) -> TopologyState:
     """Fetch the latest topology DAG from PostgreSQL and grab recent container spikes."""
     db = state["db"]
     
-    # Grab recent spikes (last 5 minutes)
+    # Grab recent spikes (last 5 minutes) — with transaction safety
     try:
         spikes = await get_resource_spikes_impl(300, db)
     except Exception as e:
         logger.error(f"Failed to fetch spikes: {e}")
-        spikes = "Error fetching spikes."
+        # Rollback the aborted transaction so subsequent queries work
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        spikes = "Error fetching spikes — no telemetry data available."
         
     # Grab DAG
     nodes_result = await db.execute(select(TopologyNode))
@@ -90,13 +95,22 @@ async def analyze_impact(state: TopologyState) -> TopologyState:
     Nodes: {json.dumps(state['nodes'], indent=2)}
     Edges: {json.dumps(state['edges'], indent=2)}
     
-    Here are the recent container resource spikes (from cAdvisor telemetry):
+    Here are the recent container resource spike candidates (from cAdvisor telemetry):
     {state['recent_spikes']}
     
+    Mapping rules:
+    - Each spike candidate includes a "Node <topology_node_id>" field. When topology_node_id is present, treat it as the AUTHORITATIVE mapping to a DAG node — do NOT fuzzy match.
+    - Only use fuzzy matching (container name vs node label) as a fallback when topology_node_id is absent or says "(unmapped)".
+
+    Status assignment rules:
+    - Resource spikes alone (CPU or memory increases) should normally produce 'warning', NOT 'compromised'.
+    - Only recommend 'compromised' when there is additional evidence beyond raw telemetry spikes (e.g., anomalous network exfiltration, known vulnerability exploitation, or correlated multi-signal threats).
+    - Downstream propagation should be conservative: only propagate to 'warning' for direct dependencies of a 'warning' node. Do not cascade 'compromised' from telemetry spikes alone.
+
     Your goal:
-    1. Identify if any nodes in the DAG represent the containers showing massive spikes (fuzzy match container names to node labels/types).
-    2. If a node is spiking, mark it as 'warning' or 'compromised'.
-    3. Analyze the edges. If a compromised node has an edge to a downstream node, propagate the risk (e.g., mark the downstream node as 'warning').
+    1. Identify which DAG nodes correspond to the spiking containers (using the mapping rules above).
+    2. If a node is spiking, mark it as 'warning' (or 'compromised' only with strong evidence beyond telemetry).
+    3. Analyze the edges. If a warning node has an edge to a downstream node, consider propagating 'warning' conservatively.
     4. Generate Vulnerabilities and Insights explaining your reasoning.
     
     Return the structured output containing the updates you intend to apply.
@@ -172,7 +186,11 @@ topology_agent = builder.compile()
 
 # --- Entrypoint ---
 async def run_topology_analysis(db: AsyncSession) -> Dict[str, Any]:
-    """Execute the topology background agent."""
+    """Execute the topology background agent.
+
+    Resilient: catches all exceptions so ``/topology/scan`` can still
+    return a valid topology graph even when the analysis pipeline fails.
+    """
     initial_state = {"db": db, "messages": []}
     
     # Execute the graph
@@ -181,4 +199,9 @@ async def run_topology_analysis(db: AsyncSession) -> Dict[str, Any]:
         return final_state.get("analysis_result", {})
     except Exception as e:
         logger.error(f"Topology Analysis workflow failed: {e}")
+        # Ensure the session is usable for subsequent queries
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         return {}
