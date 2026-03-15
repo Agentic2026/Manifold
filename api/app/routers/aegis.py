@@ -71,6 +71,7 @@ class TopologyEdge(BaseModel):
     label: str
     animated: Optional[bool] = False
     display: Optional[str] = "visible"  # "visible" | "hidden"
+    inferredSubtype: Optional[str] = None  # "shared_network" | "same_project" | None
 
 
 class TopologyGroup(BaseModel):
@@ -851,18 +852,42 @@ def _derive_groups_from_node_ids(
     return node_group, list(groups_map.values())
 
 
-def _classify_edge_display(edge_kind: str, edge_label: str, source_group: str | None, target_group: str | None) -> str:
-    """Determine whether an edge should be visible or hidden in the default view.
+def _infer_edge_subtype(edge_label: str) -> str | None:
+    """Derive the inferred edge subtype from the edge label text.
 
-    Rules:
-    - Declared dependency / API edges → always visible
-    - Inferred edges within the same group → hidden (reduces clutter)
+    Returns ``"shared_network"`` for shared-network edges,
+    ``"same_project"`` for same-project edges, or ``None``.
+    """
+    label_lower = edge_label.lower()
+    if "shared network" in label_lower:
+        return "shared_network"
+    if "same project" in label_lower:
+        return "same_project"
+    return None
+
+
+def _classify_edge_display(
+    edge_kind: str,
+    edge_label: str,
+    source_group: str | None,
+    target_group: str | None,
+) -> str:
+    """Determine whether an edge should be visible or hidden in the default overview.
+
+    Nuanced rules:
+    - Declared dependency / API / network edges → always visible
     - Cross-group inferred edges → visible
+    - Same-group inferred shared-network edges → visible (security-relevant)
+    - Same-group inferred same-project-only edges → hidden (reduces clutter)
     """
     if edge_kind != "inferred":
         return "visible"
     # Cross-group inferred edges remain visible
     if source_group and target_group and source_group != target_group:
+        return "visible"
+    # Within the same group: show shared-network, hide same-project-only
+    subtype = _infer_edge_subtype(edge_label)
+    if subtype == "shared_network":
         return "visible"
     return "hidden"
 
@@ -941,6 +966,7 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
                 label=e.label,
                 animated=e.animated,
                 display=_classify_edge_display(e.kind, e.label, src_grp, tgt_grp),
+                inferredSubtype=_infer_edge_subtype(e.label) if e.kind == "inferred" else None,
             )
         )
 

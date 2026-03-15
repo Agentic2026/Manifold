@@ -64,6 +64,7 @@ interface TopologyGraphProps {
   searchQuery: string;
   selectedNodeId: string | null;
   onNodeSelect: (nodeId: string | null) => void;
+  focusedGroupId?: string | null;
 }
 
 export function TopologyGraph({
@@ -71,12 +72,13 @@ export function TopologyGraph({
   searchQuery,
   selectedNodeId,
   onNodeSelect,
+  focusedGroupId = null,
 }: TopologyGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
   // Convert topology data to Cytoscape elements
-  const elements = useMemo(() => topologyToElements(data), [data]);
+  const elements = useMemo(() => topologyToElements(data, focusedGroupId), [data, focusedGroupId]);
 
   // ── Initialize Cytoscape ──────────────────────────────────
 
@@ -170,6 +172,33 @@ export function TopologyGraph({
       });
     }
   }, [searchQuery]);
+
+  // ── Focus group: center on selected group ─────────────────
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    if (focusedGroupId) {
+      // Fit to the focused group's children
+      const groupNode = cy.getElementById(focusedGroupId);
+      if (groupNode.length > 0) {
+        const children = groupNode.children();
+        if (children.length > 0) {
+          cy.animate({
+            fit: { eles: children, padding: 60 },
+            duration: 400,
+          });
+        }
+      }
+    } else {
+      // Reset: fit all elements
+      cy.animate({
+        fit: { eles: cy.elements(), padding: 40 },
+        duration: 400,
+      });
+    }
+  }, [focusedGroupId]);
 
   // ── Fit view helper ────────────────────────────────────────
 

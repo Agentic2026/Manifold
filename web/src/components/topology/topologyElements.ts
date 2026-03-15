@@ -2,6 +2,11 @@
  * topologyElements.ts — Convert the Manifold topology API response into
  * Cytoscape.js element definitions with compound (group) nodes and
  * edge display filtering.
+ *
+ * Supports two rendering modes:
+ * - **Overview** (`focusedGroupId === null`): nuanced edge visibility from backend
+ * - **Focused** (`focusedGroupId === "<id>"`): show internal edges for
+ *   the selected group, dim unrelated groups/edges
  */
 
 import type {
@@ -34,6 +39,7 @@ export interface CyEdgeData {
   kind: string;
   label: string;
   display: string;        // "visible" | "hidden"
+  inferredSubtype: string | null;
   animated: boolean;
 }
 
@@ -79,6 +85,66 @@ export function deriveGroupsFromNodes(
   return { groups: [...groupSet.values()], nodeGroupMap: map };
 }
 
+// ── Edge class helpers ────────────────────────────────────────
+
+/**
+ * Compute CSS classes for an edge in overview mode (no group focused).
+ * Uses the backend-provided `display` field and `inferredSubtype`.
+ */
+function overviewEdgeClasses(
+  kind: string,
+  display: string,
+  inferredSubtype: string | null,
+): string {
+  const classes: string[] = [`kind-${kind}`];
+
+  if (display === "hidden") {
+    classes.push("hidden-edge");
+  } else if (kind === "inferred" && inferredSubtype === "shared_network") {
+    classes.push("inferred-network");
+  } else if (kind === "inferred" && inferredSubtype === "same_project") {
+    classes.push("inferred-project");
+  }
+
+  return classes.filter(Boolean).join(" ");
+}
+
+/**
+ * Compute CSS classes for an edge in focused-group mode.
+ *
+ * - Edges fully inside the focused group → visible (with subtype styling)
+ * - Cross-group edges touching the focused group → visible
+ * - All other edges → dimmed
+ */
+function focusedEdgeClasses(
+  kind: string,
+  inferredSubtype: string | null,
+  sourceGroup: string | undefined,
+  targetGroup: string | undefined,
+  focusedGroupId: string,
+): string {
+  const classes: string[] = [`kind-${kind}`];
+
+  const srcInGroup = sourceGroup === focusedGroupId;
+  const tgtInGroup = targetGroup === focusedGroupId;
+
+  if (srcInGroup && tgtInGroup) {
+    // Internal edge for focused group — always visible
+    if (kind === "inferred" && inferredSubtype === "same_project") {
+      classes.push("inferred-project");
+    } else if (kind === "inferred" && inferredSubtype === "shared_network") {
+      classes.push("inferred-network");
+    }
+  } else if (srcInGroup || tgtInGroup) {
+    // Cross-group edge touching focused group — visible
+  } else {
+    // Unrelated edge — dimmed
+    classes.push("focus-dimmed");
+  }
+
+  return classes.filter(Boolean).join(" ");
+}
+
 // ── Main conversion ───────────────────────────────────────────
 
 /**
@@ -86,10 +152,14 @@ export function deriveGroupsFromNodes(
  *
  * - Groups become compound (parent) nodes.
  * - Service nodes become child nodes inside their group.
- * - Edges with `display === "hidden"` are tagged with a `hidden` class
- *   but still included so they can be toggled.
+ * - Edge visibility depends on the rendering mode (overview vs focused).
+ *
+ * @param focusedGroupId - When set, enables focused-group rendering.
  */
-export function topologyToElements(data: TopologyData): CyElement[] {
+export function topologyToElements(
+  data: TopologyData,
+  focusedGroupId?: string | null,
+): CyElement[] {
   const elements: CyElement[] = [];
 
   // Resolve groups — prefer backend-provided, fall back to derived
@@ -107,8 +177,11 @@ export function topologyToElements(data: TopologyData): CyElement[] {
     nodeGroupMap = derived.nodeGroupMap;
   }
 
+  const isFocused = !!focusedGroupId;
+
   // 1. Compound (group) parent nodes
   for (const g of groups) {
+    const dimmed = isFocused && g.id !== focusedGroupId;
     elements.push({
       group: "nodes",
       data: {
@@ -121,13 +194,18 @@ export function topologyToElements(data: TopologyData): CyElement[] {
         groupKind: g.kind,
         groupLabel: g.label,
       },
-      classes: `group group-${g.kind}`,
+      classes: [
+        "group",
+        `group-${g.kind}`,
+        dimmed ? "focus-dimmed" : "",
+      ].filter(Boolean).join(" "),
     });
   }
 
   // 2. Service nodes (children of their group, if any)
   for (const n of data.nodes) {
     const parent = nodeGroupMap.get(n.id);
+    const dimmed = isFocused && parent !== focusedGroupId;
     elements.push({
       group: "nodes",
       data: {
@@ -139,13 +217,26 @@ export function topologyToElements(data: TopologyData): CyElement[] {
         parent,
         description: n.description,
       },
-      classes: `service status-${n.status} type-${n.type}`,
+      classes: [
+        "service",
+        `status-${n.status}`,
+        `type-${n.type}`,
+        dimmed ? "focus-dimmed" : "",
+      ].filter(Boolean).join(" "),
     });
   }
 
   // 3. Edges
   for (const e of data.edges) {
     const display = e.display ?? "visible";
+    const inferredSubtype = e.inferredSubtype ?? null;
+    const sourceGroup = nodeGroupMap.get(e.source);
+    const targetGroup = nodeGroupMap.get(e.target);
+
+    const edgeClasses = isFocused
+      ? focusedEdgeClasses(e.kind, inferredSubtype, sourceGroup, targetGroup, focusedGroupId!)
+      : overviewEdgeClasses(e.kind, display, inferredSubtype);
+
     elements.push({
       group: "edges",
       data: {
@@ -155,14 +246,10 @@ export function topologyToElements(data: TopologyData): CyElement[] {
         kind: e.kind,
         label: e.label,
         display,
+        inferredSubtype,
         animated: e.animated ?? false,
       },
-      classes: [
-        `kind-${e.kind}`,
-        display === "hidden" ? "hidden-edge" : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
+      classes: edgeClasses,
     });
   }
 

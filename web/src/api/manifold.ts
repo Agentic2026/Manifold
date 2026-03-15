@@ -55,6 +55,8 @@ export interface TopologyNode {
   groupLabel?: string;
 }
 
+export type InferredSubtype = "shared_network" | "same_project";
+
 export interface TopologyEdge {
   id: string;
   source: string;
@@ -63,6 +65,7 @@ export interface TopologyEdge {
   label: string;
   animated?: boolean;
   display?: EdgeDisplay;
+  inferredSubtype?: InferredSubtype | null;
 }
 
 export interface TopologyGroup {

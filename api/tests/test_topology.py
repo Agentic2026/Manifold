@@ -1479,6 +1479,9 @@ async def test_topology_edge_display_classification():
             for edge in topo_data["edges"]:
                 assert "display" in edge
                 assert edge["display"] in ("visible", "hidden")
+                # inferredSubtype should be present for inferred edges
+                if edge["kind"] == "inferred":
+                    assert edge["inferredSubtype"] in ("shared_network", "same_project", None)
 
 
 @pytest.mark.asyncio
@@ -1506,17 +1509,28 @@ async def test_topology_imported_nodes_get_project_groups():
 
 
 @pytest.mark.asyncio
-async def test_topology_inferred_same_group_edges_hidden():
-    """Inferred edges within the same group should be hidden."""
-    from app.routers.aegis import _classify_edge_display
+async def test_topology_inferred_edge_nuanced_display():
+    """Inferred edges use nuanced display policy based on subtype."""
+    from app.routers.aegis import _classify_edge_display, _infer_edge_subtype
 
-    # Same group, inferred → hidden
-    assert _classify_edge_display("inferred", "shared network", "g1", "g1") == "hidden"
-    # Cross-group, inferred → visible
-    assert _classify_edge_display("inferred", "shared network", "g1", "g2") == "visible"
+    # Same group, shared-network → visible (security-relevant)
+    assert _classify_edge_display("inferred", "inferred: shared network (myapp_default)", "g1", "g1") == "visible"
+
+    # Same group, same-project-only → hidden (reduces clutter)
+    assert _classify_edge_display("inferred", "inferred: same project (myapp)", "g1", "g1") == "hidden"
+
+    # Cross-group, inferred → visible regardless of subtype
+    assert _classify_edge_display("inferred", "inferred: shared network (net1)", "g1", "g2") == "visible"
+    assert _classify_edge_display("inferred", "inferred: same project (myapp)", "g1", "g2") == "visible"
+
     # Non-inferred edges → always visible
     assert _classify_edge_display("api", "API call", "g1", "g1") == "visible"
     assert _classify_edge_display("network", "network link", "g1", "g1") == "visible"
+
+    # Subtype extraction
+    assert _infer_edge_subtype("inferred: shared network (myapp_default)") == "shared_network"
+    assert _infer_edge_subtype("inferred: same project (myapp)") == "same_project"
+    assert _infer_edge_subtype("some other label") is None
 
 
 @pytest.mark.asyncio

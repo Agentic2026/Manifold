@@ -183,10 +183,45 @@ export const cytoscapeStylesheet: Stylesheet[] = [
       opacity: 0.4,
     },
   },
+  // Shared-network inferred edges — security-relevant, slightly more visible
+  {
+    selector: "edge.inferred-network",
+    style: {
+      "line-style": "dotted",
+      "line-color": "#3b82f6",
+      "target-arrow-color": "#3b82f6",
+      width: 1,
+      opacity: 0.5,
+    },
+  },
+  // Same-project-only inferred edges — de-emphasized
+  {
+    selector: "edge.inferred-project",
+    style: {
+      "line-style": "dotted",
+      "line-color": "#64748b",
+      "target-arrow-color": "#64748b",
+      width: 0.75,
+      opacity: 0.25,
+    },
+  },
   {
     selector: "edge.hidden-edge",
     style: {
       display: "none",
+    },
+  },
+  // Focus-mode dimming for unrelated elements
+  {
+    selector: "node.focus-dimmed",
+    style: {
+      opacity: 0.2,
+    },
+  },
+  {
+    selector: "edge.focus-dimmed",
+    style: {
+      opacity: 0.1,
     },
   },
   {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   X,
   Play,
@@ -12,11 +12,13 @@ import {
   RefreshCw,
   BrainCircuit,
   Network,
+  Layers,
 } from "lucide-react";
 import {
   manifoldApi,
   type TopologyNode,
   type TopologyData,
+  type TopologyGroup,
   type NodeStatus,
 } from "../api/manifold";
 import { cn } from "../lib/utils";
@@ -319,9 +321,16 @@ export function SystemMap() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<"live" | "offline" | "empty">("live");
   const [searchQuery, setSearchQuery] = useState("");
+  const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState(3);
   const { addToast } = useToast();
   const { setNodeContext, setIsOpen: setChatOpen } = useChat();
+
+  // Derive available groups for the group selector
+  const groupList: TopologyGroup[] = useMemo(() => {
+    if (!topologyData) return [];
+    return topologyData.groups ?? [];
+  }, [topologyData]);
 
   // Sync selected node to chat context
   useEffect(() => {
@@ -433,8 +442,27 @@ export function SystemMap() {
           </div>
         </div>
 
-        {/* Right: search + bell + scan */}
+        {/* Right: group selector + search + bell + scan */}
         <div className="flex items-center gap-2">
+          {/* Group selector */}
+          {groupList.length > 0 && (
+            <div className="relative hidden sm:flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-text-muted" />
+              <select
+                value={focusedGroupId ?? ""}
+                onChange={(e) => setFocusedGroupId(e.target.value || null)}
+                className="py-1.5 pl-1 pr-6 text-xs bg-surface-alt border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+              >
+                <option value="">All groups</option>
+                {groupList.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}{g.kind !== "ungrouped" ? ` (${g.kind})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="relative hidden sm:block">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
             <input
@@ -506,6 +534,7 @@ export function SystemMap() {
               searchQuery={searchQuery}
               selectedNodeId={selectedNode?.id ?? null}
               onNodeSelect={handleNodeSelect}
+              focusedGroupId={focusedGroupId}
             />
           )}
           <Legend />
