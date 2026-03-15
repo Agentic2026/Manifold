@@ -50,9 +50,9 @@ _PROFILES: Dict[str, Dict[str, Any]] = {
         "filesystem_churn_mb": 500,
     },
     "demo": {
-        "cpu_avg_cores": 0.15,
+        "cpu_avg_cores": 0.25,
         "memory_surge_mb": 30,
-        "egress_mbps": 5.0,
+        "egress_mbps": 8.0,
         "beaconing_min_intervals": 3,
         "beaconing_cv_threshold": 0.55,
         "filesystem_churn_mb": 50,
