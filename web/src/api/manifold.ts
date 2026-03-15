@@ -20,9 +20,7 @@ export type ServiceType =
   | "api"
   | "agent"
   | "database";
-export type EdgeKind = "network" | "api" | "inferred";
-export type EdgeDisplay = "visible" | "hidden";
-export type GroupKind = "network" | "project" | "ungrouped";
+export type EdgeKind = "network" | "api";
 export type VulnSeverity = "critical" | "high" | "medium" | "low";
 export type InsightType = "anomaly" | "threat" | "info";
 
@@ -50,9 +48,6 @@ export interface TopologyNode {
   description?: string;
   telemetry?: NodeTelemetry;
   analysis?: NodeAnalysis;
-  groupId?: string;
-  groupKind?: GroupKind;
-  groupLabel?: string;
 }
 
 export interface TopologyEdge {
@@ -62,19 +57,11 @@ export interface TopologyEdge {
   kind: EdgeKind;
   label: string;
   animated?: boolean;
-  display?: EdgeDisplay;
-}
-
-export interface TopologyGroup {
-  id: string;
-  label: string;
-  kind: GroupKind;
 }
 
 export interface TopologyData {
   nodes: TopologyNode[];
   edges: TopologyEdge[];
-  groups: TopologyGroup[];
   lastUpdated: string;
   scanStatus: "idle" | "scanning" | "complete";
 }
@@ -135,11 +122,6 @@ export interface SecurityReport {
 const MOCK_TOPOLOGY: TopologyData = {
   scanStatus: "idle",
   lastUpdated: new Date().toISOString(),
-  groups: [
-    { id: "net:public", label: "public", kind: "network" },
-    { id: "net:internal", label: "internal", kind: "network" },
-    { id: "net:data", label: "data", kind: "network" },
-  ],
   nodes: [
     {
       id: "ext-lb",
@@ -148,7 +130,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "gateway",
       position: { x: 60, y: 300 },
-      groupId: "net:public", groupKind: "network", groupLabel: "public",
       description:
         "Public-facing load balancer. Routes all external traffic to internal services via TLS termination.",
       telemetry: { ingressMbps: 45.2, egressMbps: 38.7, latencyMs: 12, errorRate: 0.01 },
@@ -166,7 +147,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "frontend",
       position: { x: 320, y: 120 },
-      groupId: "net:public", groupKind: "network", groupLabel: "public",
       description:
         "React SPA served via CDN. Communicates with backend APIs and Auth Service.",
       telemetry: { ingressMbps: 12.4, egressMbps: 8.1, latencyMs: 22, errorRate: 0.02 },
@@ -183,7 +163,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "service",
       position: { x: 620, y: 50 },
-      groupId: "net:internal", groupKind: "network", groupLabel: "internal",
       description:
         "Handles authentication and session management. Issues short-lived JWTs.",
       telemetry: { ingressMbps: 3.1, egressMbps: 2.8, latencyMs: 18, errorRate: 0.0 },
@@ -200,7 +179,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "warning",
       type: "api",
       position: { x: 400, y: 320 },
-      groupId: "net:internal", groupKind: "network", groupLabel: "internal",
       description:
         "Node.js backend hub. Routes requests to downstream services and the LLM agent via MCP bridge.",
       telemetry: { ingressMbps: 24.5, egressMbps: 12.4, latencyMs: 67, errorRate: 0.8 },
@@ -226,7 +204,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "compromised",
       type: "agent",
       position: { x: 660, y: 320 },
-      groupId: "net:internal", groupKind: "network", groupLabel: "internal",
       description:
         "LLM-powered context agent with MCP tool access. Reads from Vector Store and returns augmented responses.",
       telemetry: { ingressMbps: 8.2, egressMbps: 31.4, latencyMs: 340, errorRate: 4.2 },
@@ -254,7 +231,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "healthy",
       type: "database",
       position: { x: 840, y: 160 },
-      groupId: "net:data", groupKind: "network", groupLabel: "data",
       description:
         "PostgreSQL primary. Stores user records, session data, and application state.",
       telemetry: { ingressMbps: 6.3, egressMbps: 5.9, latencyMs: 4, errorRate: 0.0 },
@@ -272,7 +248,6 @@ const MOCK_TOPOLOGY: TopologyData = {
       status: "warning",
       type: "database",
       position: { x: 950, y: 420 },
-      groupId: "net:data", groupKind: "network", groupLabel: "data",
       description:
         "Qdrant vector database. Holds document embeddings used by the Context Agent for RAG.",
       telemetry: { ingressMbps: 14.7, egressMbps: 28.3, latencyMs: 11, errorRate: 0.3 },

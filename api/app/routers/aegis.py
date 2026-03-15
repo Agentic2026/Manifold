@@ -58,31 +58,20 @@ class TopologyNode(BaseModel):
     description: Optional[str] = None
     telemetry: Optional[NodeTelemetry] = None
     analysis: Optional[NodeAnalysis] = None
-    groupId: Optional[str] = None
-    groupKind: Optional[str] = None  # "network" | "project" | "ungrouped"
-    groupLabel: Optional[str] = None
 
 
 class TopologyEdge(BaseModel):
     id: str
     source: str
     target: str
-    kind: str  # "network" | "api" | "inferred"
+    kind: str  # "network" | "api"
     label: str
     animated: Optional[bool] = False
-    display: Optional[str] = "visible"  # "visible" | "hidden"
-
-
-class TopologyGroup(BaseModel):
-    id: str
-    label: str
-    kind: str  # "network" | "project" | "ungrouped"
 
 
 class TopologyData(BaseModel):
     nodes: List[TopologyNode]
     edges: List[TopologyEdge]
-    groups: List[TopologyGroup] = []
     lastUpdated: str
     scanStatus: str  # "idle" | "scanning" | "complete"
 
@@ -764,109 +753,6 @@ async def import_topology(
     }
 
 
-def _build_group_membership(
-    containers: list,
-) -> tuple[dict[str, tuple[str, str, str]], list[TopologyGroup]]:
-    """Derive group membership for topology nodes from container metadata.
-
-    Returns ``(node_id → (groupId, groupKind, groupLabel), groups_list)``.
-
-    Grouping priority:
-    1. Shared Docker network (from compose labels)
-    2. Compose project
-    3. Ungrouped / misc
-    """
-    from collections import defaultdict
-
-    # network → set of node_ids
-    net_members: dict[str, set[str]] = defaultdict(set)
-    # node_id → project
-    node_project: dict[str, str] = {}
-
-    for c in containers:
-        node_id = c.topology_node_id
-        if not node_id:
-            continue
-        labels = c.labels if isinstance(c.labels, dict) else {}
-        project = labels.get("com.docker.compose.project")
-        if project:
-            node_project[node_id] = project
-            net_members[f"{project}_default"].add(node_id)
-        networks_csv = labels.get("com.docker.compose.networks")
-        if networks_csv:
-            for net in networks_csv.split(","):
-                net = net.strip()
-                if net:
-                    net_members[net].add(node_id)
-
-    # Assign each node to its best group.
-    # Priority: largest shared network first, then project, then ungrouped.
-    node_group: dict[str, tuple[str, str, str]] = {}
-    groups_map: dict[str, TopologyGroup] = {}
-
-    # Sort networks by member count descending so nodes join their biggest network
-    for net_name in sorted(net_members, key=lambda n: len(net_members[n]), reverse=True):
-        members = net_members[net_name]
-        if len(members) < 2:
-            continue
-        gid = f"net:{net_name}"
-        if gid not in groups_map:
-            groups_map[gid] = TopologyGroup(id=gid, label=net_name, kind="network")
-        for nid in members:
-            if nid not in node_group:
-                node_group[nid] = (gid, "network", net_name)
-
-    # Fall back to project grouping for remaining nodes
-    for nid, project in node_project.items():
-        if nid not in node_group:
-            gid = f"proj:{project}"
-            if gid not in groups_map:
-                groups_map[gid] = TopologyGroup(id=gid, label=project, kind="project")
-            node_group[nid] = (gid, "project", project)
-
-    return node_group, list(groups_map.values())
-
-
-def _derive_groups_from_node_ids(
-    node_ids: list[str],
-) -> tuple[dict[str, tuple[str, str, str]], list[TopologyGroup]]:
-    """Fallback grouping based only on the project prefix in node IDs.
-
-    Used when no container metadata is available (e.g. imported topologies
-    or mock/seed data).
-    """
-    node_group: dict[str, tuple[str, str, str]] = {}
-    groups_map: dict[str, TopologyGroup] = {}
-
-    for nid in node_ids:
-        if "__" in nid:
-            project, _ = nid.split("__", 1)
-        else:
-            project = "ungrouped"
-        gid = f"proj:{project}"
-        if gid not in groups_map:
-            groups_map[gid] = TopologyGroup(id=gid, label=project, kind="project")
-        node_group[nid] = (gid, "project", project)
-
-    return node_group, list(groups_map.values())
-
-
-def _classify_edge_display(edge_kind: str, edge_label: str, source_group: str | None, target_group: str | None) -> str:
-    """Determine whether an edge should be visible or hidden in the default view.
-
-    Rules:
-    - Declared dependency / API edges → always visible
-    - Inferred edges within the same group → hidden (reduces clutter)
-    - Cross-group inferred edges → visible
-    """
-    if edge_kind != "inferred":
-        return "visible"
-    # Cross-group inferred edges remain visible
-    if source_group and target_group and source_group != target_group:
-        return "visible"
-    return "hidden"
-
-
 @router.get("/topology", response_model=TopologyData)
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
     import time as _time
@@ -886,29 +772,8 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
     node_statuses = await _compute_effective_node_statuses(db)
     edges_q = await db.execute(select(DBEdge))
 
-    # Build group membership from container metadata
-    containers_q = await db.execute(select(Container))
-    containers = containers_q.scalars().all()
-
-    all_node_ids = [n.id for n, _, _ in node_statuses]
-    if containers:
-        node_group, groups = _build_group_membership(containers)
-    else:
-        node_group, groups = {}, []
-
-    # For nodes not covered by container metadata, fall back to ID-based grouping
-    ungrouped_ids = [nid for nid in all_node_ids if nid not in node_group]
-    if ungrouped_ids:
-        fallback_groups, fallback_list = _derive_groups_from_node_ids(ungrouped_ids)
-        node_group.update(fallback_groups)
-        existing_gids = {g.id for g in groups}
-        for g in fallback_list:
-            if g.id not in existing_gids:
-                groups.append(g)
-
     nodes = []
     for n, status, telem in node_statuses:
-        grp = node_group.get(n.id)
         nodes.append(
             TopologyNode(
                 id=n.id,
@@ -920,18 +785,11 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
                 description=n.description,
                 telemetry=telem,
                 analysis=n.analysis if isinstance(n.analysis, dict) else None,
-                groupId=grp[0] if grp else None,
-                groupKind=grp[1] if grp else None,
-                groupLabel=grp[2] if grp else None,
             )
         )
 
     edges = []
     for e in edges_q.scalars().all():
-        src_entry = node_group.get(e.source_id)
-        tgt_entry = node_group.get(e.target_id)
-        src_grp = src_entry[0] if src_entry else None
-        tgt_grp = tgt_entry[0] if tgt_entry else None
         edges.append(
             TopologyEdge(
                 id=e.id,
@@ -940,14 +798,12 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
                 kind=e.kind,
                 label=e.label,
                 animated=e.animated,
-                display=_classify_edge_display(e.kind, e.label, src_grp, tgt_grp),
             )
         )
 
     return TopologyData(
         nodes=nodes,
         edges=edges,
-        groups=groups,
         lastUpdated=datetime.now(UTC).isoformat(),
         scanStatus="idle",
     )
