@@ -93,7 +93,9 @@ export function AegisLayout() {
   // Fetch security score from backend on mount and periodically
   useEffect(() => {
     const fetchScore = () => {
-      aegisApi.getSecurityScore().then(setSecurityScore).catch(() => {});
+      aegisApi.getSecurityScore().then(setSecurityScore).catch(() => {
+        // Score fetch may fail when backend is unavailable; silently retry on next interval
+      });
     };
     const timer = setTimeout(fetchScore, 0);
     const interval = setInterval(fetchScore, 15_000);

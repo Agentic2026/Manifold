@@ -16,6 +16,9 @@ from app.services.discovery import reconcile_topology_from_containers
 
 router = APIRouter(prefix="/api", tags=["aegis"])
 
+# Throttle lazy topology reconciliation to at most once every 30 seconds
+_last_reconcile_ts: float = 0.0
+
 
 # ────────────────────────────────────────────────────────────
 # Pydantic models (match frontend TypeScript types exactly)
@@ -539,10 +542,17 @@ async def import_topology(
 
 @router.get("/topology", response_model=TopologyData)
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
-    # If topology is empty, attempt lazy reconciliation from live containers
-    check = await db.execute(select(DBNode.id).limit(1))
-    if check.scalar_one_or_none() is None:
-        await reconcile_topology_from_containers(db)
+    import time as _time
+    global _last_reconcile_ts
+
+    # Lazy reconciliation: if topology is empty, attempt to rebuild from
+    # live container metadata (throttled to at most once every 30 s).
+    now = _time.monotonic()
+    if now - _last_reconcile_ts > 30:
+        check = await db.execute(select(DBNode.id).limit(1))
+        if check.scalar_one_or_none() is None:
+            await reconcile_topology_from_containers(db)
+        _last_reconcile_ts = now
 
     nodes_q = await db.execute(select(DBNode))
     edges_q = await db.execute(select(DBEdge))

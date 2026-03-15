@@ -9,7 +9,6 @@ is required.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,7 +75,7 @@ async def reconcile_topology_from_containers(db: AsyncSession) -> int:
 
     # Group containers → services
     # key: (project, service_name)
-    service_map: dict[tuple[str, str], list[Any]] = defaultdict(list)
+    service_map: dict[tuple[str, str], list[Container]] = defaultdict(list)
     for c in containers:
         node_id = c.topology_node_id
         if not node_id:

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -39,7 +40,7 @@ async def _ensure_tables() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables ensured.")
-    except Exception:
+    except (OperationalError, ProgrammingError):
         # Non-PostgreSQL backends (e.g. SQLite in e2e tests) may not support
         # JSONB columns.  The h4ckath0n auth tables are created separately by
         # the framework lifespan; telemetry/topology simply won't be available.
