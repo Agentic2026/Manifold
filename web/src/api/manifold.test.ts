@@ -5,13 +5,13 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 // Import AFTER stubbing fetch
-const { aegisApi } = await import("../api/aegis");
+const { manifoldApi } = await import("../api/manifold");
 
 beforeEach(() => {
   mockFetch.mockReset();
 });
 
-describe("aegisApi.getTopology", () => {
+describe("manifoldApi.getTopology", () => {
   it("returns live data when the backend responds", async () => {
     const liveData = {
       nodes: [{ id: "svc", label: "Service", serviceId: "svc", status: "healthy", type: "service", position: { x: 0, y: 0 } }],
@@ -24,7 +24,7 @@ describe("aegisApi.getTopology", () => {
       json: async () => liveData,
     });
 
-    const result = await aegisApi.getTopology();
+    const result = await manifoldApi.getTopology();
     expect(result).toEqual(liveData);
     expect(result!.nodes[0]?.id).toBe("svc");
   });
@@ -32,14 +32,14 @@ describe("aegisApi.getTopology", () => {
   it("returns null (not mock data) when backend is unreachable in live mode", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-    const result = await aegisApi.getTopology();
+    const result = await manifoldApi.getTopology();
     expect(result).toBeNull();
   });
 
   it("returns mock data only when explicitly requested", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-    const result = await aegisApi.getTopology({ useMock: true });
+    const result = await manifoldApi.getTopology({ useMock: true });
     expect(result).not.toBeNull();
     expect(result!.nodes.length).toBeGreaterThan(0);
   });
@@ -72,7 +72,7 @@ describe("NodeTelemetry optional fields", () => {
       json: async () => liveData,
     });
 
-    const result = await aegisApi.getTopology();
+    const result = await manifoldApi.getTopology();
     expect(result).not.toBeNull();
     const node = result!.nodes[0];
     expect(node?.telemetry?.ingressMbps).toBe(1.5);

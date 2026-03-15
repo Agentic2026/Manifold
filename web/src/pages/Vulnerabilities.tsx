@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bug, Clock, ExternalLink } from "lucide-react";
-import { aegisApi, type Vulnerability, type VulnSeverity } from "../api/aegis";
+import { manifoldApi, type Vulnerability, type VulnSeverity } from "../api/manifold";
 import { cn } from "../lib/utils";
 
 const SEV_CONFIG: Record<
@@ -70,7 +70,7 @@ export function Vulnerabilities() {
   const [filter, setFilter] = useState<VulnSeverity | "all">("all");
 
   useEffect(() => {
-    aegisApi.getVulnerabilities().then(setVulns);
+    manifoldApi.getVulnerabilities().then(setVulns);
   }, []);
 
   const counts: Record<VulnSeverity, number> = {

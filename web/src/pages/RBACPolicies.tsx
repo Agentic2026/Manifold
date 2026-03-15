@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { KeyRound, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
-import { aegisApi, type RBACPolicy } from "../api/aegis";
+import { manifoldApi, type RBACPolicy } from "../api/manifold";
 import { cn } from "../lib/utils";
 
 const RISK_CONFIG: Record<
@@ -93,7 +93,7 @@ export function RBACPolicies() {
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
-    aegisApi.getRBACPolicies().then(setPolicies);
+    manifoldApi.getRBACPolicies().then(setPolicies);
   }, []);
 
   const counts = {
