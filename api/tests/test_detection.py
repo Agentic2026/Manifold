@@ -518,11 +518,21 @@ async def test_detection_profile_config():
 
     with patch("app.core.config.settings.detection_profile", "demo"):
         thresholds = _get_thresholds()
+        assert thresholds["cpu_avg_cores"] == 0.25
+        assert thresholds["memory_surge_mb"] == 64
         assert thresholds["egress_mbps"] == 8.0
+        assert thresholds["beaconing_min_intervals"] == 5
+        assert thresholds["beaconing_cv_threshold"] == 0.25
+        assert thresholds["filesystem_churn_mb"] == 128
 
     with patch("app.core.config.settings.detection_profile", "normal"):
         thresholds = _get_thresholds()
+        assert thresholds["cpu_avg_cores"] == 0.8
+        assert thresholds["memory_surge_mb"] == 200
         assert thresholds["egress_mbps"] == 50.0
+        assert thresholds["beaconing_min_intervals"] == 5
+        assert thresholds["beaconing_cv_threshold"] == 0.35
+        assert thresholds["filesystem_churn_mb"] == 500
 
 
 @pytest.mark.asyncio
