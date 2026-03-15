@@ -51,11 +51,11 @@ _PROFILES: Dict[str, Dict[str, Any]] = {
     },
     "demo": {
         "cpu_avg_cores": 0.25,
-        "memory_surge_mb": 30,
+        "memory_surge_mb": 64,
         "egress_mbps": 8.0,
-        "beaconing_min_intervals": 3,
-        "beaconing_cv_threshold": 0.55,
-        "filesystem_churn_mb": 50,
+        "beaconing_min_intervals": 5,
+        "beaconing_cv_threshold": 0.25,
+        "filesystem_churn_mb": 128,
     },
 }
 
