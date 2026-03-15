@@ -637,12 +637,17 @@ async def isolate_node(node_id: str, db: AsyncSession = Depends(get_db_session))
     result = await db.execute(select(DBNode).where(DBNode.id == node_id))
     node = result.scalar_one_or_none()
     if node is None:
-        return {"success": False, "nodeId": node_id, "action": "isolate", "simulated": True,
-                "detail": "Node not found"}
+        return {
+            "success": False, "nodeId": node_id, "action": "isolate",
+            "simulated": True, "detail": "Node not found",
+        }
     node.status = "isolated"
     await db.commit()
-    return {"success": True, "nodeId": node_id, "action": "isolate", "simulated": True,
-            "detail": "Node status set to isolated (simulated — no real network isolation)"}
+    return {
+        "success": True, "nodeId": node_id, "action": "isolate",
+        "simulated": True,
+        "detail": "Node status set to isolated (simulated — no real network isolation)",
+    }
 
 
 @router.get("/vulnerabilities", response_model=List[Vulnerability])
@@ -690,12 +695,17 @@ async def revoke_rbac(node_id: str, db: AsyncSession = Depends(get_db_session)) 
     result = await db.execute(select(DBNode).where(DBNode.id == node_id))
     node = result.scalar_one_or_none()
     if node is None:
-        return {"success": False, "nodeId": node_id, "action": "rbac_revoke", "simulated": True,
-                "detail": "Node not found"}
+        return {
+            "success": False, "nodeId": node_id, "action": "rbac_revoke",
+            "simulated": True, "detail": "Node not found",
+        }
     node.status = "compromised"
     await db.commit()
-    return {"success": True, "nodeId": node_id, "action": "rbac_revoke", "simulated": True,
-            "detail": "Node status set to compromised, RBAC revoked (simulated)"}
+    return {
+        "success": True, "nodeId": node_id, "action": "rbac_revoke",
+        "simulated": True,
+        "detail": "Node status set to compromised, RBAC revoked (simulated)",
+    }
 
 
 @router.get("/security-score", response_model=SecurityScore)
