@@ -506,21 +506,28 @@ async def _aggregate_node_telemetry(
 def _compute_node_status(
     current_status: str,
     telemetry: Optional[NodeTelemetry],
+    detection_severity: Optional[str] = None,
     last_snapshot_ts: Optional[datetime] = None,
 ) -> str:
     """Deterministic status engine.
 
     Rules (applied in priority order):
-    1. If no telemetry data exists at all → keep current DB status (may be
+    1. If detection lane produced a warning or critical finding → at
+       least ``warning``.
+    2. If no telemetry data exists at all → keep current DB status (may be
        freshly imported and no containers matched yet).
-    2. If the most recent snapshot is older than ``_STALE_SECONDS`` → ``warning``
+    3. If the most recent snapshot is older than ``_STALE_SECONDS`` → ``warning``
        (stale data).
-    3. If egress > ``_EGRESS_WARNING_MBPS`` → ``warning``.
-    4. Otherwise → ``healthy``.
+    4. If egress > ``_EGRESS_WARNING_MBPS`` → ``warning``.
+    5. Otherwise → ``healthy``.
 
     This engine never promotes a node to *compromised* – that requires
-    stronger evidence (e.g. LLM-driven analysis).
+    stronger evidence (e.g. LLM-driven analysis or manual action).
     """
+    # Fast-lane detection escalation
+    if detection_severity in ("warning", "critical"):
+        return "warning"
+
     if telemetry is None:
         return current_status  # no mapped containers or no data yet
 
@@ -551,12 +558,29 @@ async def _compute_effective_node_statuses(
 
     This is the **single source of truth** for effective node status used
     by both ``GET /topology`` and ``GET /security-score``.
+
+    Incorporates detection-lane summaries so nodes react immediately
+    when suspicious behaviour is detected, without waiting for LLM.
     """
+    from app.services.detection import run_detectors
+
     nodes_q = await db.execute(select(DBNode))
+    nodes = nodes_q.scalars().all()
+
+    # Run fast-lane detectors to get per-node severity
+    detection_map: dict[str, str] = {}
+    try:
+        _events, summaries = await run_detectors(db)
+        for s in summaries:
+            detection_map[s.node_id] = s.max_severity
+    except Exception as exc:
+        logger.warning("Detection lane failed during status computation: %s", exc)
+
     results = []
-    for n in nodes_q.scalars().all():
+    for n in nodes:
         telem = await _aggregate_node_telemetry(n.id, db)
-        effective = _compute_node_status(n.status, telem)
+        det_severity = detection_map.get(n.id)
+        effective = _compute_node_status(n.status, telem, detection_severity=det_severity)
         results.append((n, effective, telem))
     return results
 
@@ -949,3 +973,17 @@ async def get_reports(
         )
         for r in q.scalars().all()
     ]
+
+
+@router.get("/detections")
+async def get_detections(
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Run deterministic detectors and return current detection events + summaries."""
+    from app.services.detection import run_detectors
+
+    events, summaries = await run_detectors(db)
+    return {
+        "events": [e.model_dump() for e in events],
+        "summaries": [s.model_dump() for s in summaries],
+    }

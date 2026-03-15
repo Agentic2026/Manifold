@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://postgres:postgres@localhost:5432/manifold"
     )
     cadvisor_metrics_api_token: str = "my-secret-token"
+    detection_profile: str = "normal"  # "normal" | "demo"
 
     model_config = SettingsConfigDict(
         env_file=".env",
