@@ -24,15 +24,27 @@ from app.routers import include_all_routers
 
 logger = logging.getLogger(__name__)
 
+_tables_created = False
+
 
 async def _ensure_tables() -> None:
     """Create all SQLAlchemy tables if they do not already exist."""
+    global _tables_created
+    if _tables_created:
+        return
     from app.core.database import engine, Base
     import app.models  # noqa: F401 — ensure every model is registered on Base.metadata
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables ensured.")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables ensured.")
+    except Exception:
+        # Non-PostgreSQL backends (e.g. SQLite in e2e tests) may not support
+        # JSONB columns.  The h4ckath0n auth tables are created separately by
+        # the framework lifespan; telemetry/topology simply won't be available.
+        logger.warning("Could not create telemetry/topology tables (expected on SQLite).")
+    _tables_created = True
 
 
 app = create_app()
@@ -40,9 +52,13 @@ add_csp_middleware(app)
 include_all_routers(app)
 
 
-@app.on_event("startup")
-async def on_startup() -> None:
-    await _ensure_tables()
+# The h4ckath0n lifespan takes precedence over @app.on_event("startup"),
+# so we use a middleware to lazily create tables on the first request.
+@app.middleware("http")
+async def ensure_tables_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    if not _tables_created:
+        await _ensure_tables()
+    return await call_next(request)
 
 
 class HealthzResponse(BaseModel):

@@ -121,10 +121,12 @@ export async function clearDeviceKeyMaterial(): Promise<void> {
  * reused on next login.
  */
 export async function clearDeviceAuthorization(): Promise<void> {
+  // Clear the in-memory cache synchronously first so any concurrent
+  // callers of getDeviceIdentity() see null immediately.
+  cachedIdentity = null;
+  identityLoaded = true;
   await Promise.all([
     del(DB_DEVICE_ID),
     del(DB_USER_ID),
   ]);
-  cachedIdentity = null;
-  identityLoaded = true;
 }

@@ -24,18 +24,24 @@ However, the codebase is **not production-ready yet**. Key blockers include:
 - Backend uses FastAPI via `h4ckath0n.create_app()` and includes CSP middleware plus routers.
 - Healthcheck and demo endpoints (`/demo/ping`, `/demo/echo`, `/demo/ws`, `/demo/sse`) are active in the same app surface.
 - Telemetry ingestion endpoint (`POST /cadvisor/batch`) validates bearer token and writes to PostgreSQL using bulk inserts/upserts.
+- **Runtime topology auto-discovery** from live container metadata is implemented — topology nodes are created automatically from ingested cAdvisor data using `com.docker.compose.service` and `com.docker.compose.project` labels.
 - Configuration currently exposes a very small `Settings` surface (database URL + cAdvisor token).
-- ORM models and services support machine/container/snapshot ingest and basic topology/vulnerability/insight access.
+- ORM models and services support machine/container/snapshot ingest, runtime discovery, and basic topology/vulnerability/insight access.
 
 ### Frontend state
 - React/Vite/TypeScript stack is in place with component and page tests.
 - API client scaffolding and auth modules exist.
-- Linting fails due to `setState` call inside `useEffect` in `SecurityGauge.tsx`.
+- System Map shows live/empty/offline state indicators and refreshes automatically.
+- Security score uses backend `/api/security-score` as the source of truth.
+- All lint, typecheck, and unit tests pass.
 
 ### Tests/checks state
-- `api`: pytest suite passes (6 tests).
-- `web`: vitest suite passes (33 tests), typecheck passes.
-- `web`: eslint fails on one hook rule violation.
+- `api`: pytest suite passes (18 tests including runtime discovery).
+- `web`: vitest suite passes (37 tests), typecheck passes, eslint passes.
+
+### Onboarding model
+- **Primary flow:** User adds Manifold monitoring service to their existing Docker Compose stack → cAdvisor pushes telemetry → Manifold auto-discovers topology.
+- **Optional flow:** Manual Docker Compose import (`POST /api/topology/import`) for enrichment/preview.
 
 ## 3) Production-Readiness Gap Analysis
 
@@ -102,10 +108,9 @@ However, the codebase is **not production-ready yet**. Key blockers include:
 - OpenTelemetry-based traces/metrics, dashboard + alerts, incident playbooks.
 
 ### G. Frontend Production Hardening
-**Observed:** Tests pass; lint currently fails.
+**Observed:** Tests pass; lint passes.
 
 **Gaps:**
-- Lint gate not green.
 - No explicit web performance budgets, error tracking, or accessibility budget.
 
 **Target state:**

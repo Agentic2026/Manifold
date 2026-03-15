@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router";
+import { Outlet, NavLink } from "react-router";
 import {
   Shield,
   Network,
@@ -85,12 +85,10 @@ export function AegisLayout() {
   } | null>(null);
 
   const { logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = useCallback(async () => {
     await logout();
-    navigate("/");
-  }, [logout, navigate]);
+  }, [logout]);
 
   // Fetch security score from backend on mount and periodically
   useEffect(() => {
