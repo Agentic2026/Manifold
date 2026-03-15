@@ -3,6 +3,7 @@ import {
   topologyToElements,
   deriveGroupsFromNodes,
   type CyNodeData,
+  type CyEdgeData,
 } from "./topologyElements";
 import type {
   TopologyData,
@@ -200,5 +201,257 @@ describe("topologyToElements", () => {
     for (const el of serviceElements) {
       expect((el.data as CyNodeData).parent).toBeDefined();
     }
+  });
+});
+
+// ── Edge visibility — overview mode ───────────────────────────
+
+describe("topologyToElements edge visibility (overview)", () => {
+  const groups: TopologyGroup[] = [
+    { id: "net:int", label: "internal", kind: "network" },
+    { id: "net:pub", label: "public", kind: "network" },
+  ];
+
+  function makeGroupedData(
+    edges: TopologyData["edges"],
+  ): TopologyData {
+    return makeData(
+      [
+        makeNode("a", { groupId: "net:int", groupKind: "network", groupLabel: "internal" }),
+        makeNode("b", { groupId: "net:int", groupKind: "network", groupLabel: "internal" }),
+        makeNode("c", { groupId: "net:pub", groupKind: "network", groupLabel: "public" }),
+      ],
+      edges,
+      groups,
+    );
+  }
+
+  it("regression: inferred intra-group shared-network edges are NOT hidden", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "inferred",
+        label: "inferred: shared network (int_default)",
+        display: "visible",
+        inferredSubtype: "shared_network",
+      },
+    ]);
+
+    const elements = topologyToElements(data);
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    expect(edge!.classes).not.toContain("hidden-edge");
+    expect(edge!.classes).toContain("inferred-network");
+  });
+
+  it("same-project-only inferred edges are hidden in overview", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "inferred",
+        label: "inferred: same project (myapp)",
+        display: "hidden",
+        inferredSubtype: "same_project",
+      },
+    ]);
+
+    const elements = topologyToElements(data);
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    expect(edge!.classes).toContain("hidden-edge");
+  });
+
+  it("cross-group inferred edges are visible in overview", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "c",
+        kind: "inferred",
+        label: "inferred: shared network (bridge)",
+        display: "visible",
+        inferredSubtype: "shared_network",
+      },
+    ]);
+
+    const elements = topologyToElements(data);
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    expect(edge!.classes).not.toContain("hidden-edge");
+    expect(edge!.classes).not.toContain("focus-dimmed");
+  });
+
+  it("declared/API edges are always visible in overview", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "api",
+        label: "API call",
+        display: "visible",
+      },
+    ]);
+
+    const elements = topologyToElements(data);
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    expect(edge!.classes).not.toContain("hidden-edge");
+    expect(edge!.classes).toContain("kind-api");
+  });
+
+  it("includes inferredSubtype in edge data", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "inferred",
+        label: "shared network",
+        display: "visible",
+        inferredSubtype: "shared_network",
+      },
+    ]);
+
+    const elements = topologyToElements(data);
+    const edge = elements.find((e) => e.data.id === "e1");
+    expect((edge!.data as CyEdgeData).inferredSubtype).toBe("shared_network");
+  });
+});
+
+// ── Edge visibility — focused group mode ──────────────────────
+
+describe("topologyToElements focused group mode", () => {
+  const groups: TopologyGroup[] = [
+    { id: "net:int", label: "internal", kind: "network" },
+    { id: "net:pub", label: "public", kind: "network" },
+  ];
+
+  function makeGroupedData(
+    edges: TopologyData["edges"],
+  ): TopologyData {
+    return makeData(
+      [
+        makeNode("a", { groupId: "net:int", groupKind: "network", groupLabel: "internal" }),
+        makeNode("b", { groupId: "net:int", groupKind: "network", groupLabel: "internal" }),
+        makeNode("c", { groupId: "net:pub", groupKind: "network", groupLabel: "public" }),
+      ],
+      edges,
+      groups,
+    );
+  }
+
+  it("dims unrelated groups and nodes when a group is focused", () => {
+    const data = makeGroupedData([]);
+    const elements = topologyToElements(data, "net:int");
+
+    const focusedGroup = elements.find((e) => e.data.id === "net:int");
+    const otherGroup = elements.find((e) => e.data.id === "net:pub");
+    const internalNode = elements.find((e) => e.data.id === "a");
+    const externalNode = elements.find((e) => e.data.id === "c");
+
+    expect(focusedGroup!.classes).not.toContain("focus-dimmed");
+    expect(otherGroup!.classes).toContain("focus-dimmed");
+    expect(internalNode!.classes).not.toContain("focus-dimmed");
+    expect(externalNode!.classes).toContain("focus-dimmed");
+  });
+
+  it("shows internal edges in focused group", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "inferred",
+        label: "inferred: same project (myapp)",
+        display: "hidden",
+        inferredSubtype: "same_project",
+      },
+    ]);
+
+    const elements = topologyToElements(data, "net:int");
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    // In focused mode, internal edges are visible (no hidden-edge, no focus-dimmed)
+    expect(edge!.classes).not.toContain("hidden-edge");
+    expect(edge!.classes).not.toContain("focus-dimmed");
+    expect(edge!.classes).toContain("inferred-project");
+  });
+
+  it("shows cross-group edges touching focused group", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "c",
+        kind: "inferred",
+        label: "inferred: shared network (bridge)",
+        display: "visible",
+        inferredSubtype: "shared_network",
+      },
+    ]);
+
+    const elements = topologyToElements(data, "net:int");
+    const edge = elements.find((e) => e.data.id === "e1");
+
+    expect(edge!.classes).not.toContain("focus-dimmed");
+  });
+
+  it("dims edges unrelated to focused group", () => {
+    // Create a third group for a truly unrelated edge
+    const threeGroups: TopologyGroup[] = [
+      { id: "net:a", label: "A", kind: "network" },
+      { id: "net:b", label: "B", kind: "network" },
+      { id: "net:c", label: "C", kind: "network" },
+    ];
+
+    const data = makeData(
+      [
+        makeNode("n1", { groupId: "net:a", groupKind: "network", groupLabel: "A" }),
+        makeNode("n2", { groupId: "net:b", groupKind: "network", groupLabel: "B" }),
+        makeNode("n3", { groupId: "net:c", groupKind: "network", groupLabel: "C" }),
+      ],
+      [
+        {
+          id: "e-unrelated",
+          source: "n2",
+          target: "n3",
+          kind: "inferred",
+          label: "inferred: shared network (x)",
+          display: "visible",
+          inferredSubtype: "shared_network",
+        },
+      ],
+      threeGroups,
+    );
+
+    const elements = topologyToElements(data, "net:a");
+    const edge = elements.find((e) => e.data.id === "e-unrelated");
+
+    expect(edge!.classes).toContain("focus-dimmed");
+  });
+
+  it("All groups mode (null) resets to overview behavior", () => {
+    const data = makeGroupedData([
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        kind: "inferred",
+        label: "inferred: shared network (int_default)",
+        display: "visible",
+        inferredSubtype: "shared_network",
+      },
+    ]);
+
+    const elements = topologyToElements(data, null);
+
+    // No dimming in overview mode
+    const allClasses = elements.map((e) => e.classes ?? "").join(" ");
+    expect(allClasses).not.toContain("focus-dimmed");
   });
 });
