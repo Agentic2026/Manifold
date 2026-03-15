@@ -112,7 +112,7 @@ async def test_ingestion_triggers_detector_and_updates_status():
     t2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Two snapshots with massive egress delta to trigger egress_burst
-    # demo profile: threshold 5 Mbps; tx delta = 100MB in 30s = ~26 Mbps
+    # demo profile: threshold 8 Mbps; tx delta = 100MB in 30s = ~26 Mbps
     batch1 = _make_batch(
         t1,
         [
@@ -261,7 +261,7 @@ async def test_demo_profile_more_sensitive_than_normal():
     t1 = (now - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
     t2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Moderate egress: 10 Mbps — above demo threshold (5) but below normal (50)
+    # Moderate egress: 10 Mbps — above demo threshold (8) but below normal (50)
     # tx delta = 10 Mbps => ~75 MB in 60 seconds => 75_000_000 bytes
     batch1 = _make_batch(
         t1,
@@ -518,7 +518,7 @@ async def test_detection_profile_config():
 
     with patch("app.core.config.settings.detection_profile", "demo"):
         thresholds = _get_thresholds()
-        assert thresholds["egress_mbps"] == 5.0
+        assert thresholds["egress_mbps"] == 8.0
 
     with patch("app.core.config.settings.detection_profile", "normal"):
         thresholds = _get_thresholds()
