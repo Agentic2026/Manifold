@@ -1423,3 +1423,138 @@ async def test_report_fingerprint_stable():
         await session.commit()
 
     assert fp1_deep == fp2_deep
+
+
+# ────────────────────────────────────────────────────────────
+# Tests: grouped topology model + edge classification
+# ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_topology_response_includes_groups():
+    """GET /topology should include a groups array and group metadata on nodes."""
+    await _reset_tables()
+
+    mock_run_analysis = AsyncMock(return_value={"status": "mocked"})
+
+    with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            # Seed the DB
+            await ac.post("/topology/seed")
+
+            topo_resp = await ac.get("/topology")
+            assert topo_resp.status_code == 200
+            topo_data = topo_resp.json()
+
+            # groups key exists
+            assert "groups" in topo_data
+            assert isinstance(topo_data["groups"], list)
+
+            # Every node should have group metadata (seed data uses fallback grouping)
+            for node in topo_data["nodes"]:
+                assert "groupId" in node
+                assert "groupKind" in node
+                assert "groupLabel" in node
+
+
+@pytest.mark.asyncio
+async def test_topology_edge_display_classification():
+    """Edges should include a display field: 'visible' or 'hidden'."""
+    await _reset_tables()
+
+    mock_run_analysis = AsyncMock(return_value={"status": "mocked"})
+
+    with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post("/topology/seed")
+
+            topo_resp = await ac.get("/topology")
+            assert topo_resp.status_code == 200
+            topo_data = topo_resp.json()
+
+            for edge in topo_data["edges"]:
+                assert "display" in edge
+                assert edge["display"] in ("visible", "hidden")
+
+
+@pytest.mark.asyncio
+async def test_topology_imported_nodes_get_project_groups():
+    """Nodes imported from compose should get project-based groups."""
+    await _reset_tables()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
+        assert resp.status_code == 200
+
+        topo_resp = await ac.get("/topology")
+        assert topo_resp.status_code == 200
+        topo_data = topo_resp.json()
+
+        # Imported nodes should have project-based group IDs
+        for node in topo_data["nodes"]:
+            assert node["groupKind"] in ("project", "network")
+            assert node["groupId"] is not None
+
+        # Should have at least one group
+        assert len(topo_data["groups"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_topology_inferred_same_group_edges_hidden():
+    """Inferred edges within the same group should be hidden."""
+    from app.routers.aegis import _classify_edge_display
+
+    # Same group, inferred → hidden
+    assert _classify_edge_display("inferred", "shared network", "g1", "g1") == "hidden"
+    # Cross-group, inferred → visible
+    assert _classify_edge_display("inferred", "shared network", "g1", "g2") == "visible"
+    # Non-inferred edges → always visible
+    assert _classify_edge_display("api", "API call", "g1", "g1") == "visible"
+    assert _classify_edge_display("network", "network link", "g1", "g1") == "visible"
+
+
+@pytest.mark.asyncio
+async def test_topology_group_derivation_from_node_ids():
+    """_derive_groups_from_node_ids should create project groups from node ID prefixes."""
+    from app.routers.aegis import _derive_groups_from_node_ids
+
+    node_ids = ["myapp__web", "myapp__api", "myapp__db", "other__worker"]
+    node_group, groups = _derive_groups_from_node_ids(node_ids)
+
+    # Should have two groups
+    assert len(groups) == 2
+    group_ids = {g.id for g in groups}
+    assert "proj:myapp" in group_ids
+    assert "proj:other" in group_ids
+
+    # All nodes should be assigned
+    assert len(node_group) == 4
+    assert node_group["myapp__web"][0] == "proj:myapp"
+    assert node_group["other__worker"][0] == "proj:other"
+
+
+@pytest.mark.asyncio
+async def test_topology_scan_returns_groups():
+    """POST /topology/scan should also include groups in response."""
+    await _reset_tables()
+
+    mock_run_analysis = AsyncMock(return_value={"status": "mocked"})
+
+    with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post("/topology/seed")
+
+            scan_resp = await ac.post("/topology/scan")
+            assert scan_resp.status_code == 200
+            scan_data = scan_resp.json()
+
+            assert "groups" in scan_data
+            assert scan_data["scanStatus"] == "complete"

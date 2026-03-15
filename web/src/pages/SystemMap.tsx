@@ -1,27 +1,5 @@
-import {
-  ReactFlow,
-  Background,
-  BackgroundVariant,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  type NodeProps,
-  type Node,
-  type Edge,
-  MarkerType,
-  Handle,
-  Position,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import { useEffect, useState, useCallback } from "react";
 import {
-  Globe,
-  Monitor as MonitorIcon,
-  ShieldCheck,
-  Zap,
-  Bot,
-  Database,
   X,
   Play,
   Bell,
@@ -38,37 +16,17 @@ import {
 import {
   manifoldApi,
   type TopologyNode,
-  type TopologyEdge,
-  type ServiceType,
+  type TopologyData,
   type NodeStatus,
 } from "../api/manifold";
 import { cn } from "../lib/utils";
-import { AnimatedParticleEdge } from "../components/AnimatedParticleEdge";
+import { TopologyGraph } from "../components/topology/TopologyGraph";
 import { useToast } from "../context/ToastContext";
 import { useChat } from "../context/ChatContext";
 
 // ────────────────────────────────────────────────────────────
-// Icons per service type
-// ────────────────────────────────────────────────────────────
-
-const SERVICE_ICONS: Record<ServiceType, React.ElementType> = {
-  gateway:  Globe,
-  frontend: MonitorIcon,
-  service:  ShieldCheck,
-  api:      Zap,
-  agent:    Bot,
-  database: Database,
-};
-
-// ────────────────────────────────────────────────────────────
 // Status helpers
 // ────────────────────────────────────────────────────────────
-
-const STATUS_BORDER: Record<NodeStatus, string> = {
-  healthy:     "border-healthy",
-  warning:     "border-suspicious",
-  compromised: "border-compromised",
-};
 
 const STATUS_LABEL: Record<NodeStatus, string> = {
   healthy:     "Secure",
@@ -84,138 +42,6 @@ const STATUS_BADGE: Record<NodeStatus, string> = {
   compromised:
     "bg-compromised/10 text-compromised border border-compromised/20",
 };
-
-const STATUS_DOT: Record<NodeStatus, string> = {
-  healthy:     "bg-healthy",
-  warning:     "bg-suspicious",
-  compromised: "bg-compromised animate-pulse",
-};
-
-// ────────────────────────────────────────────────────────────
-// Custom Node
-// ────────────────────────────────────────────────────────────
-
-interface ServiceNodeData {
-  label: string;
-  serviceId: string;
-  status: NodeStatus;
-  type: ServiceType;
-  [key: string]: unknown;
-}
-
-function ServiceNode({ data, selected }: NodeProps) {
-  const d = data as ServiceNodeData;
-  const Icon = SERVICE_ICONS[d.type] ?? Zap;
-
-  return (
-    <div
-      className={cn(
-        "relative bg-surface-raised border-2 rounded-xl px-3.5 py-2.5 min-w-[148px] shadow-lg",
-        "transition-all duration-150",
-        STATUS_BORDER[d.status],
-        selected
-          ? "ring-2 ring-primary ring-offset-2 ring-offset-surface"
-          : "hover:shadow-xl",
-      )}
-    >
-      {/* Alert badge for compromised */}
-      {d.status === "compromised" && (
-        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-compromised text-white text-[9px] font-bold shadow">
-          !
-        </span>
-      )}
-
-      {/* Header row */}
-      <div className="flex items-center gap-2 mb-1">
-        <div
-          className={cn(
-            "p-1 rounded-md flex-shrink-0",
-            d.status === "compromised"
-              ? "bg-compromised/15"
-              : d.status === "warning"
-                ? "bg-suspicious/15"
-                : "bg-primary/10",
-          )}
-        >
-          <Icon
-            className={cn(
-              "w-3.5 h-3.5",
-              d.status === "compromised"
-                ? "text-compromised"
-                : d.status === "warning"
-                  ? "text-suspicious"
-                  : "text-primary",
-            )}
-          />
-        </div>
-        <span className="text-[13px] font-semibold text-text leading-tight truncate max-w-[100px]">
-          {d.label}
-        </span>
-      </div>
-
-      {/* ID */}
-      <p className="text-[10px] font-mono text-text-muted">{d.serviceId}</p>
-
-      {/* Status dot */}
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", STATUS_DOT[d.status])} />
-        <span className={cn("text-[10px] font-medium",
-          d.status === "compromised" ? "text-compromised" :
-          d.status === "warning" ? "text-suspicious" : "text-healthy"
-        )}>
-          {STATUS_LABEL[d.status]}
-        </span>
-      </div>
-
-      {/* Handles */}
-      <Handle type="target" position={Position.Left}  />
-      <Handle type="target" position={Position.Top}   />
-      <Handle type="source" position={Position.Right} />
-      <Handle type="source" position={Position.Bottom}/>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
-// Convert API data → React Flow format
-// ────────────────────────────────────────────────────────────
-
-function toRFNode(n: TopologyNode): Node {
-  return {
-    id: n.id,
-    type: "serviceNode",
-    position: n.position,
-    data: {
-      label: n.label,
-      serviceId: n.serviceId,
-      status: n.status,
-      type: n.type,
-    },
-  };
-}
-
-// Node status lookup for edge coloring (populated on load)
-let nodeStatusMap: Record<string, string> = {};
-
-function toRFEdge(e: TopologyEdge): Edge {
-  return {
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: "particleEdge",
-    animated: e.animated ?? false,
-    markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
-    data: {
-      kind: e.kind,
-      label: e.label,
-      sourceStatus: nodeStatusMap[e.source] ?? "healthy",
-      targetStatus: nodeStatusMap[e.target] ?? "healthy",
-    },
-  };
-}
-
-const NODE_TYPES = { serviceNode: ServiceNode };
-const EDGE_TYPES = { particleEdge: AnimatedParticleEdge };
 
 // ────────────────────────────────────────────────────────────
 // Telemetry card
@@ -487,9 +313,7 @@ function StatusBar({ nodes }: { nodes: TopologyNode[] }) {
 // ────────────────────────────────────────────────────────────
 
 export function SystemMap() {
-  const [topologyNodes, setTopologyNodes] = useState<TopologyNode[]>([]);
-  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([]);
-  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [topologyData, setTopologyData] = useState<TopologyData | null>(null);
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -510,17 +334,10 @@ export function SystemMap() {
     }
   }, [selectedNode, setNodeContext]);
 
-  const loadTopology = useCallback((data: { nodes: TopologyNode[]; edges: TopologyEdge[]; lastUpdated: string }) => {
-    // Build status map for edge coloring
-    nodeStatusMap = {};
-    for (const n of data.nodes) {
-      nodeStatusMap[n.id] = n.status;
-    }
-    setTopologyNodes(data.nodes);
-    setRfNodes(data.nodes.map(toRFNode));
-    setRfEdges(data.edges.map(toRFEdge));
+  const loadTopology = useCallback((data: TopologyData) => {
+    setTopologyData(data);
     setLastUpdated(new Date(data.lastUpdated));
-  }, [setRfNodes, setRfEdges]);
+  }, []);
 
   const fetchTopology = useCallback(async () => {
     const data = await manifoldApi.getTopology();
@@ -552,17 +369,17 @@ export function SystemMap() {
     addToast({ title: "Deep scan complete", description: "Topology updated with latest findings.", variant: "info" });
   };
 
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      const found = topologyNodes.find((n) => n.id === node.id);
+  const handleNodeSelect = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId) {
+        setSelectedNode(null);
+        return;
+      }
+      const found = topologyData?.nodes.find((n) => n.id === nodeId);
       setSelectedNode(found ?? null);
     },
-    [topologyNodes],
+    [topologyData],
   );
-
-  const handlePaneClick = useCallback(() => {
-    setSelectedNode(null);
-  }, []);
 
   const handleIsolate = async () => {
     if (!selectedNode) return;
@@ -588,15 +405,7 @@ export function SystemMap() {
     setChatOpen(true);
   };
 
-  // Filter nodes by search
-  const filteredNodes = rfNodes.map((n) => {
-    if (!searchQuery) return { ...n, hidden: false };
-    const data = n.data as ServiceNodeData;
-    const match =
-      data.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      data.serviceId.toLowerCase().includes(searchQuery.toLowerCase());
-    return { ...n, hidden: !match };
-  });
+  const topologyNodes = topologyData?.nodes ?? [];
 
   return (
     <div className="flex flex-col h-full">
@@ -669,7 +478,7 @@ export function SystemMap() {
 
       {/* ── Canvas + Inspector ───────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* React Flow */}
+        {/* Cytoscape Graph */}
         <div className="flex-1 relative">
           {/* Empty-state overlay */}
           {topologyNodes.length === 0 && (dataSource === "live" || dataSource === "empty") && (
@@ -691,44 +500,15 @@ export function SystemMap() {
               </p>
             </div>
           )}
-          <ReactFlow
-            nodes={filteredNodes}
-            edges={rfEdges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={NODE_TYPES}
-            edgeTypes={EDGE_TYPES}
-            onNodeClick={handleNodeClick}
-            onPaneClick={handlePaneClick}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.3}
-            maxZoom={2}
-            defaultEdgeOptions={{
-              markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
-            }}
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={20}
-              size={1}
-              color="var(--color-border)"
+          {topologyData && (
+            <TopologyGraph
+              data={topologyData}
+              searchQuery={searchQuery}
+              selectedNodeId={selectedNode?.id ?? null}
+              onNodeSelect={handleNodeSelect}
             />
-            <Controls position="bottom-right" />
-            <MiniMap
-              position="top-right"
-              nodeColor={(n) => {
-                const d = n.data as ServiceNodeData;
-                return d.status === "compromised"
-                  ? "var(--color-compromised)"
-                  : d.status === "warning"
-                    ? "var(--color-suspicious)"
-                    : "var(--color-healthy)";
-              }}
-              maskColor="var(--color-surface-alt)"
-            />
-            <Legend />
-          </ReactFlow>
+          )}
+          <Legend />
         </div>
 
         {/* Inspector panel */}
