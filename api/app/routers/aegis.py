@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 import logging
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 import yaml
 from fastapi import APIRouter, Depends
@@ -71,7 +71,7 @@ class TopologyEdge(BaseModel):
     label: str
     animated: Optional[bool] = False
     display: Optional[str] = "visible"  # "visible" | "hidden"
-    inferredSubtype: Optional[str] = None  # "shared_network" | "same_project" | None
+    inferredSubtype: Optional[Literal["shared_network", "same_project"]] = None
 
 
 class TopologyGroup(BaseModel):

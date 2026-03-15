@@ -233,8 +233,8 @@ export function topologyToElements(
     const sourceGroup = nodeGroupMap.get(e.source);
     const targetGroup = nodeGroupMap.get(e.target);
 
-    const edgeClasses = isFocused
-      ? focusedEdgeClasses(e.kind, inferredSubtype, sourceGroup, targetGroup, focusedGroupId!)
+    const edgeClasses = isFocused && focusedGroupId
+      ? focusedEdgeClasses(e.kind, inferredSubtype, sourceGroup, targetGroup, focusedGroupId)
       : overviewEdgeClasses(e.kind, display, inferredSubtype);
 
     elements.push({
