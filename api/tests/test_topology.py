@@ -623,3 +623,410 @@ async def test_security_score_endpoint():
         assert "score" in data
         assert "breakdown" in data
         assert data["score"] >= 0 and data["score"] <= 100
+
+
+# ────────────────────────────────────────────────────────────
+# Regression: telemetry tool shape — nested CPU usage
+# ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_spike_tool_nested_cpu_shape():
+    """get_resource_spikes_impl works with cpu_stats = {usage: {total: N, ...}}.
+
+    This is the actual cAdvisor shape stored by ingestion.  The old SQL-based
+    implementation would crash with InvalidTextRepresentation because it cast
+    the JSON object to numeric.
+    """
+    await _reset_tables()
+
+    from app.agents.tools.telemetry import get_resource_spikes_impl
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Ingest TWO batches with different CPU totals to produce a delta
+    batch1 = {
+        "schema_version": "1",
+        "sent_at": ts1,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/spike-test-1", "aliases": ["spike"], "namespace": "docker"},
+            "container_spec": {
+                "image": "spike:latest",
+                "labels": {
+                    "com.docker.compose.service": "spike",
+                    "com.docker.compose.project": "spikeproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts1,
+                "cpu": {"usage": {"total": 1000000000, "user": 700000000, "system": 300000000}},
+                "memory": {"usage": 200000000, "working_set": 150000000},
+            },
+        }],
+    }
+    batch2 = {
+        "schema_version": "1",
+        "sent_at": ts2,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/spike-test-1", "aliases": ["spike"], "namespace": "docker"},
+            "container_spec": {
+                "image": "spike:latest",
+                "labels": {
+                    "com.docker.compose.service": "spike",
+                    "com.docker.compose.project": "spikeproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts2,
+                "cpu": {"usage": {"total": 61000000000, "user": 40000000000, "system": 21000000000}},
+                "memory": {"usage": 220000000, "working_set": 170000000},
+            },
+        }],
+    }
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+
+    # Now call get_resource_spikes_impl directly with a test session
+    async with TestSessionLocal() as session:
+        result = await get_resource_spikes_impl(lookback_seconds=300, db=session)
+
+    # Must succeed without InvalidTextRepresentation or any crash
+    assert isinstance(result, str)
+    # The result should mention the container or node
+    assert "spike" in result.lower() or "No significant" in result
+    # If there are spikes, verify the format is structured
+    if "spike" in result.lower():
+        assert "cpu_avg_cores=" in result
+        assert "mem_working_set_mb=" in result
+
+
+# ────────────────────────────────────────────────────────────
+# Regression: scan transaction recovery
+# ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_scan_transaction_recovery():
+    """POST /topology/scan returns 200 even when spike extraction fails internally.
+
+    Also verifies that a subsequent GET /topology still works
+    (session is not poisoned by an aborted transaction).
+    """
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    batch = {
+        "schema_version": "1",
+        "sent_at": now_iso,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/scan-test-1", "aliases": ["scantest"], "namespace": "docker"},
+            "container_spec": {
+                "image": "scantest:latest",
+                "labels": {
+                    "com.docker.compose.service": "scantest",
+                    "com.docker.compose.project": "scanproj",
+                },
+            },
+            "stats": {
+                "timestamp": now_iso,
+                "cpu": {"usage": {"total": 123456789, "user": 100000000, "system": 23456789}},
+                "memory": {"usage": 67108864, "working_set": 50331648},
+            },
+        }],
+    }
+
+    mock_run_analysis = AsyncMock(return_value={"node_updates": [], "new_vulnerabilities": [], "new_insights": []})
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Ingest data with nested CPU shape
+            resp = await ac.post(
+                "/cadvisor/batch", json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            assert resp.status_code == 202
+
+            # Run scan (mocked LLM)
+            with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
+                scan_resp = await ac.post("/topology/scan")
+                assert scan_resp.status_code == 200
+                scan_data = scan_resp.json()
+                assert scan_data["scanStatus"] == "complete"
+
+                # Subsequent GET /topology must not fail
+                topo_resp = await ac.get("/topology")
+                assert topo_resp.status_code == 200
+
+
+# ────────────────────────────────────────────────────────────
+# Regression: network rate delta semantics
+# ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_network_rate_delta_semantics():
+    """Network Mbps must be computed from deltas between snapshots, not cumulative totals."""
+    await _reset_tables()
+
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Two batches: cumulative rx_bytes/tx_bytes increase
+    # rx: 10_000_000 → 10_500_000 (delta 500_000 over 30s)
+    # tx: 5_000_000 → 5_200_000  (delta 200_000 over 30s)
+    batch1 = {
+        "schema_version": "1",
+        "sent_at": ts1,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/nettest-1", "aliases": ["nettest"], "namespace": "docker"},
+            "container_spec": {
+                "image": "nettest:latest",
+                "labels": {
+                    "com.docker.compose.service": "nettest",
+                    "com.docker.compose.project": "netproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts1,
+                "cpu": {"usage": {"total": 100}},
+                "memory": {"usage": 1000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 10000000, "tx_bytes": 5000000}]},
+            },
+        }],
+    }
+    batch2 = {
+        "schema_version": "1",
+        "sent_at": ts2,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/nettest-1", "aliases": ["nettest"], "namespace": "docker"},
+            "container_spec": {
+                "image": "nettest:latest",
+                "labels": {
+                    "com.docker.compose.service": "nettest",
+                    "com.docker.compose.project": "netproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts2,
+                "cpu": {"usage": {"total": 200}},
+                "memory": {"usage": 1000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 10500000, "tx_bytes": 5200000}]},
+            },
+        }],
+    }
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+
+            topo = await ac.get("/topology")
+            assert topo.status_code == 200
+            data = topo.json()
+
+            net_node = next((n for n in data["nodes"] if n["id"] == "netproj__nettest"), None)
+            assert net_node is not None, "netproj__nettest node should exist"
+            assert net_node["telemetry"] is not None
+
+            ingress = net_node["telemetry"]["ingressMbps"]
+            egress = net_node["telemetry"]["egressMbps"]
+
+            # Delta-based calculation:
+            # rx: 500_000 bytes / 30s = 16666 bytes/s → 0.133 Mbps
+            # tx: 200_000 bytes / 30s = 6666 bytes/s → 0.053 Mbps
+            # If we were using cumulative: rx would be ~2.8 Mbps — way too high
+            assert ingress < 1.0, f"Ingress {ingress} Mbps looks like cumulative, not delta"
+            assert egress < 1.0, f"Egress {egress} Mbps looks like cumulative, not delta"
+            assert ingress > 0, "Ingress should be positive from delta"
+            assert egress > 0, "Egress should be positive from delta"
+
+
+# ────────────────────────────────────────────────────────────
+# Regression: security score consistency with topology
+# ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_security_score_reflects_topology_warning():
+    """If /topology shows a node as 'warning' from high egress,
+    /security-score should reflect that same warning state.
+
+    Uses two snapshots with large rx_bytes/tx_bytes delta so that the
+    delta-based rate exceeds _EGRESS_WARNING_MBPS (50 Mbps).
+    """
+    await _reset_tables()
+
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(seconds=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Delta: 1_000_000_000 bytes over 10 seconds = 100MB/s = 800 Mbps >> 50 Mbps threshold
+    batch1 = {
+        "schema_version": "1",
+        "sent_at": ts1,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/highegress-1", "aliases": ["highegress"], "namespace": "docker"},
+            "container_spec": {
+                "image": "highegress:latest",
+                "labels": {
+                    "com.docker.compose.service": "highegress",
+                    "com.docker.compose.project": "egressproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts1,
+                "cpu": {"usage": {"total": 100}},
+                "memory": {"usage": 1000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 0, "tx_bytes": 0}]},
+            },
+        }],
+    }
+    batch2 = {
+        "schema_version": "1",
+        "sent_at": ts2,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/highegress-1", "aliases": ["highegress"], "namespace": "docker"},
+            "container_spec": {
+                "image": "highegress:latest",
+                "labels": {
+                    "com.docker.compose.service": "highegress",
+                    "com.docker.compose.project": "egressproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts2,
+                "cpu": {"usage": {"total": 200}},
+                "memory": {"usage": 1000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 0, "tx_bytes": 1000000000}]},
+            },
+        }],
+    }
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+
+            # Topology should show the node as 'warning' (high egress)
+            topo = await ac.get("/topology")
+            assert topo.status_code == 200
+            topo_data = topo.json()
+
+            egress_node = next(
+                (n for n in topo_data["nodes"] if n["id"] == "egressproj__highegress"),
+                None,
+            )
+            assert egress_node is not None
+            assert egress_node["status"] == "warning", (
+                f"Expected warning from high egress, got {egress_node['status']}"
+            )
+
+            # Security score should reflect the same warning
+            score_resp = await ac.get("/security-score")
+            assert score_resp.status_code == 200
+            score_data = score_resp.json()
+            assert score_data["score"] < 100, (
+                "Score should be <100 when topology shows a warning node"
+            )
+            # Check the breakdown mentions warning nodes
+            warning_entries = [
+                b for b in score_data["breakdown"]
+                if "warning" in b.get("label", "").lower()
+            ]
+            assert len(warning_entries) > 0, (
+                "Breakdown should mention warning nodes"
+            )
+
+
+# ────────────────────────────────────────────────────────────
+# Regression: topology_node_id in anomaly summaries
+# ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_topology_node_id_in_spike_summaries():
+    """Spike summaries include topology_node_id for authoritative mapping."""
+    await _reset_tables()
+
+    from app.agents.tools.telemetry import get_resource_spikes_impl
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    ts1 = (now - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts2 = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    batch1 = {
+        "schema_version": "1",
+        "sent_at": ts1,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/mapped-svc-1", "aliases": ["mapped"], "namespace": "docker"},
+            "container_spec": {
+                "image": "mapped:latest",
+                "labels": {
+                    "com.docker.compose.service": "mapped",
+                    "com.docker.compose.project": "mapproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts1,
+                "cpu": {"usage": {"total": 1000000000}},
+                "memory": {"usage": 100000000, "working_set": 80000000},
+            },
+        }],
+    }
+    batch2 = {
+        "schema_version": "1",
+        "sent_at": ts2,
+        "machine_name": "test-node",
+        "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+        "samples": [{
+            "container_reference": {"name": "/mapped-svc-1", "aliases": ["mapped"], "namespace": "docker"},
+            "container_spec": {
+                "image": "mapped:latest",
+                "labels": {
+                    "com.docker.compose.service": "mapped",
+                    "com.docker.compose.project": "mapproj",
+                },
+            },
+            "stats": {
+                "timestamp": ts2,
+                "cpu": {"usage": {"total": 61000000000}},
+                "memory": {"usage": 120000000, "working_set": 100000000},
+            },
+        }],
+    }
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+
+    async with TestSessionLocal() as session:
+        result = await get_resource_spikes_impl(lookback_seconds=300, db=session)
+
+    # The summary should include the topology_node_id "mapproj__mapped"
+    assert "mapproj__mapped" in result, (
+        f"topology_node_id should appear in spike summary. Got:\n{result}"
+    )
