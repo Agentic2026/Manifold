@@ -1,5 +1,6 @@
 import pytest
 import sqlite3
+from datetime import datetime, timezone
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.ext.compiler import compiles
@@ -304,3 +305,267 @@ async def test_status_engine_staleness():
     # No telemetry → keep existing status
     assert _compute_node_status("healthy", None) == "healthy"
     assert _compute_node_status("warning", None) == "warning"
+
+
+# ────────────────────────────────────────────────────────────
+# Test: runtime auto-discovery without prior import
+# ────────────────────────────────────────────────────────────
+
+MULTI_SERVICE_BATCH = {
+    "schema_version": "1",
+    "machine_name": "test-node",
+    "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+    "samples": [
+        {
+            "container_reference": {"name": "/myapp-web-1", "aliases": ["web"], "namespace": "docker"},
+            "container_spec": {
+                "image": "nginx:latest",
+                "labels": {
+                    "com.docker.compose.service": "web",
+                    "com.docker.compose.project": "myapp",
+                },
+            },
+            "stats": {
+                "cpu": {"usage": {"total": 100000}},
+                "memory": {"usage": 10000000, "working_set": 8000000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 1000, "tx_bytes": 500}]},
+            },
+        },
+        {
+            "container_reference": {"name": "/myapp-api-1", "aliases": ["api"], "namespace": "docker"},
+            "container_spec": {
+                "image": "python:3.12",
+                "labels": {
+                    "com.docker.compose.service": "api",
+                    "com.docker.compose.project": "myapp",
+                },
+            },
+            "stats": {
+                "cpu": {"usage": {"total": 200000}},
+                "memory": {"usage": 20000000, "working_set": 15000000},
+                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 2000, "tx_bytes": 1000}]},
+            },
+        },
+        {
+            "container_reference": {"name": "/myapp-db-1", "aliases": ["db"], "namespace": "docker"},
+            "container_spec": {
+                "image": "postgres:16",
+                "labels": {
+                    "com.docker.compose.service": "db",
+                    "com.docker.compose.project": "myapp",
+                },
+            },
+            "stats": {
+                "cpu": {"usage": {"total": 300000}},
+                "memory": {"usage": 30000000, "working_set": 25000000},
+            },
+        },
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_runtime_discovery_creates_topology_nodes():
+    """Ingesting containers with compose labels auto-creates topology nodes — no import needed."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
+    # Add timestamps to each sample
+    for s in batch["samples"]:
+        s["stats"]["timestamp"] = now_iso
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Ingest — no prior import
+            resp = await ac.post(
+                "/cadvisor/batch",
+                json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            assert resp.status_code == 202
+
+            # GET /api/topology should return auto-discovered nodes
+            topo = await ac.get("/api/topology")
+            assert topo.status_code == 200
+            data = topo.json()
+
+            node_ids = {n["id"] for n in data["nodes"]}
+            assert {"web", "api", "db"} == node_ids
+
+            # Edges should exist between services in the same project
+            assert len(data["edges"]) >= 1
+            # All edges should be "inferred" kind
+            for e in data["edges"]:
+                assert e["kind"] == "inferred"
+
+
+@pytest.mark.asyncio
+async def test_runtime_discovery_topology_has_telemetry():
+    """Auto-discovered topology nodes should have real telemetry."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
+    for s in batch["samples"]:
+        s["stats"]["timestamp"] = now_iso
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post(
+                "/cadvisor/batch",
+                json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            assert resp.status_code == 202
+
+            topo = await ac.get("/api/topology")
+            data = topo.json()
+
+            # "web" has network stats → should have telemetry
+            web_node = next((n for n in data["nodes"] if n["id"] == "web"), None)
+            assert web_node is not None
+            assert web_node["telemetry"] is not None
+            assert web_node["telemetry"]["ingressMbps"] >= 0
+
+            # "db" has no network stats → telemetry may be None or have zero throughput
+            db_node = next((n for n in data["nodes"] if n["id"] == "db"), None)
+            assert db_node is not None
+
+
+@pytest.mark.asyncio
+async def test_runtime_discovery_stable_across_ingests():
+    """Repeated ingests should not duplicate nodes — idempotent upsert."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
+    for s in batch["samples"]:
+        s["stats"]["timestamp"] = now_iso
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Ingest twice
+            for _ in range(2):
+                resp = await ac.post(
+                    "/cadvisor/batch",
+                    json=batch,
+                    headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+                )
+                assert resp.status_code == 202
+
+            topo = await ac.get("/api/topology")
+            data = topo.json()
+
+            # Should still be exactly 3 unique nodes
+            node_ids = [n["id"] for n in data["nodes"]]
+            assert len(node_ids) == 3
+            assert set(node_ids) == {"web", "api", "db"}
+
+
+@pytest.mark.asyncio
+async def test_runtime_discovery_coexists_with_import():
+    """Imported topology and runtime-discovered topology should coexist."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Import topology first (creates web, api, db, redis)
+            await ac.post("/api/topology/import", json={"yaml_content": SMALL_COMPOSE})
+
+            # Ingest a container matching "api" from runtime
+            single_batch = {
+                "schema_version": "1",
+                "sent_at": now_iso,
+                "machine_name": "test-node",
+                "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
+                "samples": [{
+                    "container_reference": {"name": "/proj-api-1", "aliases": ["api"], "namespace": "docker"},
+                    "container_spec": {
+                        "image": "python:3.12",
+                        "labels": {
+                            "com.docker.compose.service": "api",
+                            "com.docker.compose.project": "proj",
+                        },
+                    },
+                    "stats": {
+                        "timestamp": now_iso,
+                        "cpu": {"usage": {"total": 100}},
+                        "memory": {"usage": 1000, "working_set": 800},
+                        "network": {"interfaces": [{"name": "eth0", "rx_bytes": 500, "tx_bytes": 200}]},
+                    },
+                }],
+            }
+            resp = await ac.post(
+                "/cadvisor/batch",
+                json=single_batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            assert resp.status_code == 202
+
+            # Topology should have the imported nodes (web, api, db, redis)
+            topo = await ac.get("/api/topology")
+            data = topo.json()
+            node_ids = {n["id"] for n in data["nodes"]}
+            assert {"web", "api", "db", "redis"}.issubset(node_ids)
+
+            # The "api" node should have telemetry from the ingested container
+            api_node = next((n for n in data["nodes"] if n["id"] == "api"), None)
+            assert api_node is not None
+            assert api_node["telemetry"] is not None
+
+
+@pytest.mark.asyncio
+async def test_get_topology_empty_when_no_data():
+    """GET /api/topology returns an empty graph when no containers have been ingested."""
+    await _reset_tables()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        topo = await ac.get("/api/topology")
+        assert topo.status_code == 200
+        data = topo.json()
+        assert data["nodes"] == []
+        assert data["edges"] == []
+        assert data["scanStatus"] == "idle"
+
+
+@pytest.mark.asyncio
+async def test_edge_generation_inferred_label():
+    """Inferred edges should be labeled with 'inferred' kind, not 'network' like imports."""
+    await _reset_tables()
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
+    for s in batch["samples"]:
+        s["stats"]["timestamp"] = now_iso
+
+    with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+
+            topo = await ac.get("/api/topology")
+            data = topo.json()
+
+            for edge in data["edges"]:
+                assert edge["kind"] == "inferred"
+                assert "same project" in edge["label"]
+
+
+@pytest.mark.asyncio
+async def test_security_score_endpoint():
+    """GET /api/security-score returns a valid score."""
+    await _reset_tables()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.get("/api/security-score")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "score" in data
+        assert "breakdown" in data
+        assert data["score"] >= 0 and data["score"] <= 100

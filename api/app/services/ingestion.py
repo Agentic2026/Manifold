@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.models.telemetry import Machine, Container, ContainerMetricSnapshot
 from app.schemas.cadvisor import CadvisorBatchPayloadSchema
+from app.services.discovery import reconcile_topology_from_containers
 
 
 def _resolve_topology_node_id(sample) -> str | None:
@@ -108,4 +109,8 @@ async def process_cadvisor_batch(payload: CadvisorBatchPayloadSchema, db: AsyncS
         await db.execute(stmt_snapshots)
         
     await db.commit()
+
+    # 4. Auto-discover topology nodes from container metadata
+    await reconcile_topology_from_containers(db)
+
     return len(snapshot_values)

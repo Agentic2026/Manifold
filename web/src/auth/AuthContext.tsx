@@ -260,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName: null,
       user: null,
     });
-    navigate("/");
+    navigate("/login");
   }, [navigate]);
 
   return (

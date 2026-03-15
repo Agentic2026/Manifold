@@ -1,6 +1,6 @@
 # Manifold
 
-**Manifold** is a futuristic DAG UI security monitoring and analysis platform for *vibe-coded* containerized systems — software rapidly assembled with AI tools that may harbor hidden security risks. It maps service dependencies from Docker Compose files into an interactive topology graph and uses an LLM security agent to reason about anomalies detected through live container metrics.
+**Manifold** is a futuristic DAG UI security monitoring and analysis platform for *vibe-coded* containerized systems — software rapidly assembled with AI tools that may harbor hidden security risks. It auto-discovers service dependencies from live Docker container metadata into an interactive topology graph and uses an LLM security agent to reason about anomalies detected through live container metrics.
 
 ## Project Status
 
@@ -8,11 +8,23 @@ Manifold is currently in a **prototype-to-production transition phase**.
 
 - Core backend and frontend functionality are implemented and testable locally.
 - Backend and frontend unit tests currently pass.
-- A frontend lint issue is currently outstanding (`web/src/components/SecurityGauge.tsx`).
+- Runtime topology auto-discovery from live cAdvisor data is implemented.
 
 For a detailed assessment and phased production plan, see:
 
 - [`docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md`](docs/CURRENT_STATE_AND_PRODUCTION_PLAN.md)
+
+## How It Works — Onboarding
+
+The primary onboarding flow is:
+
+1. **You have an existing Docker Compose stack** you want to monitor.
+2. **Add the Manifold monitoring service** to your existing `docker-compose.yml` (see [Drop-in Monitoring](#drop-in-monitoring-for-existing-stacks) below).
+3. **Redeploy** with `docker compose up`.
+4. **Manifold auto-discovers services** from live runtime metadata (Docker Compose labels like `com.docker.compose.service`).
+5. **The System Map updates continuously** with real telemetry — no manual import required.
+
+> **Note:** A manual Docker Compose import endpoint (`POST /api/topology/import`) exists as an **optional** fallback for enrichment or preview purposes. It is **not required** for normal operation.
 
 ## Architecture Overview
 
@@ -22,7 +34,7 @@ Manifold is composed of three core layers:
 
 2. **LLM Security Agent Pipeline** — A backend agent ingests cAdvisor telemetry, compares it against established baselines, reasons about anomalies, and generates human-readable threat explanations. It exposes security insights through the `/api/insights` endpoint and can stream analysis via SSE (`POST /llm/chat/stream`).
 
-3. **Architecture Awareness** — Users supply a Docker Compose file so the system can map service relationships, dependencies, and exposed ports into a dependency graph. This enables the LLM to reason about how an incident in one service propagates to others, displayed as an interactive topology visualization at `/api/topology`.
+3. **Architecture Awareness** — Manifold auto-discovers service topology from live container runtime metadata (Docker Compose labels). This enables the LLM to reason about how an incident in one service propagates to others, displayed as an interactive topology visualization at `/api/topology`.
 
 ### System Context
 
@@ -82,13 +94,17 @@ curl http://localhost:8000/ingest/stats
 The `/ingest/stats` endpoint returns counts of machines, containers, and metric
 snapshots persisted in the database plus the timestamp of the latest snapshot.
 
-### Import Topology from Docker Compose
+### (Optional) Import Topology from Docker Compose
 
-After the stack is running, import your Docker Compose document to create a
-topology graph:
+> **This step is not required.** Manifold auto-discovers topology from live
+> container metadata.  Use this only as a fallback, enrichment tool, or for
+> previewing topology before containers are running.
+
+After the stack is running, you can optionally import a Docker Compose document
+to pre-populate topology nodes and declared dependency edges:
 
 ```bash
-# Import the project's own docker-compose.yml
+# Import the project's own docker-compose.yml (optional)
 curl -X POST http://localhost:8000/api/topology/import \
   -H "Content-Type: application/json" \
   -d "{\"yaml_content\": $(python3 -c "import json; print(json.dumps(open('docker-compose.yml').read()))")}"
@@ -97,11 +113,11 @@ curl -X POST http://localhost:8000/api/topology/import \
 curl http://localhost:8000/api/topology | python3 -m json.tool
 ```
 
-The topology import creates nodes from services and edges from `depends_on` /
-shared networks. Containers ingested by cAdvisor are deterministically matched
-to topology nodes via the `com.docker.compose.service` label.
+Imported nodes and runtime-discovered nodes coexist.  Containers ingested by
+cAdvisor are deterministically matched to topology nodes via the
+`com.docker.compose.service` label.
 
-### Drop-in cAdvisor for Client Environments
+### Drop-in Monitoring for Existing Stacks
 
 To add Manifold monitoring to any existing Docker Compose stack:
 

@@ -33,6 +33,7 @@ import {
   ChevronRight,
   RefreshCw,
   BrainCircuit,
+  Network,
 } from "lucide-react";
 import {
   aegisApi,
@@ -492,7 +493,7 @@ export function SystemMap() {
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [dataSource, setDataSource] = useState<"live" | "offline">("live");
+  const [dataSource, setDataSource] = useState<"live" | "offline" | "empty">("live");
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState(3);
   const { addToast } = useToast();
@@ -525,23 +526,20 @@ export function SystemMap() {
     const data = await aegisApi.getTopology();
     if (data) {
       loadTopology(data);
-      setDataSource("live");
+      setDataSource(data.nodes.length > 0 ? "live" : "empty");
     } else {
       setDataSource("offline");
     }
   }, [loadTopology]);
 
-  // Initial load
+  // Initial load + periodic live refresh every 12 seconds
   useEffect(() => {
-    fetchTopology();
-  }, [fetchTopology]);
-
-  // Periodic live refresh every 12 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchTopology();
-    }, 12_000);
-    return () => clearInterval(interval);
+    const timer = setTimeout(fetchTopology, 0);
+    const interval = setInterval(fetchTopology, 12_000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchTopology]);
 
   const handleDeepScan = async () => {
@@ -616,9 +614,9 @@ export function SystemMap() {
             )}
           </div>
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-monitoring/10 border border-monitoring/20">
-            <span className={cn("w-1.5 h-1.5 rounded-full", dataSource === "live" ? "bg-monitoring animate-pulse" : "bg-text-muted")} />
-            <span className={cn("text-[11px] font-medium", dataSource === "live" ? "text-monitoring" : "text-text-muted")}>
-              {dataSource === "live" ? "Live" : "Offline"}
+            <span className={cn("w-1.5 h-1.5 rounded-full", dataSource === "live" ? "bg-monitoring animate-pulse" : dataSource === "empty" ? "bg-suspicious" : "bg-text-muted")} />
+            <span className={cn("text-[11px] font-medium", dataSource === "live" ? "text-monitoring" : dataSource === "empty" ? "text-suspicious" : "text-text-muted")}>
+              {dataSource === "live" ? "Live" : dataSource === "empty" ? "Waiting for data" : "Offline"}
             </span>
           </div>
           <div className="hidden lg:block">
@@ -673,6 +671,26 @@ export function SystemMap() {
       <div className="flex flex-1 overflow-hidden">
         {/* React Flow */}
         <div className="flex-1 relative">
+          {/* Empty-state overlay */}
+          {topologyNodes.length === 0 && (dataSource === "live" || dataSource === "empty") && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface/80 backdrop-blur-sm">
+              <Network className="w-12 h-12 text-text-muted/40" />
+              <p className="text-sm font-medium text-text-muted">No services discovered yet</p>
+              <p className="text-xs text-text-muted/60 max-w-sm text-center">
+                Add the Manifold monitoring service to your existing Docker Compose stack and redeploy.
+                Services will appear here automatically as telemetry is ingested.
+              </p>
+            </div>
+          )}
+          {topologyNodes.length === 0 && dataSource === "offline" && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface/80 backdrop-blur-sm">
+              <AlertTriangle className="w-12 h-12 text-suspicious/60" />
+              <p className="text-sm font-medium text-text-muted">Backend unavailable</p>
+              <p className="text-xs text-text-muted/60 max-w-sm text-center">
+                Cannot connect to the Manifold API. The system will retry automatically.
+              </p>
+            </div>
+          )}
           <ReactFlow
             nodes={filteredNodes}
             edges={rfEdges}
