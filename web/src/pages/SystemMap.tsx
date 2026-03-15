@@ -321,16 +321,26 @@ function NodeInspector({
                       : "neutral"
                 }
               />
-              <TelCard
-                label="Latency"
-                value={`${node.telemetry.latencyMs} ms`}
-                trend={node.telemetry.latencyMs > 100 ? "up" : "neutral"}
-              />
-              <TelCard
-                label="Error Rate"
-                value={`${node.telemetry.errorRate}%`}
-                trend={node.telemetry.errorRate > 1 ? "up" : "neutral"}
-              />
+              {node.telemetry.latencyMs != null && (
+                <TelCard
+                  label="Latency"
+                  value={`${node.telemetry.latencyMs} ms`}
+                  trend={node.telemetry.latencyMs > 100 ? "up" : "neutral"}
+                />
+              )}
+              {node.telemetry.errorRate != null && (
+                <TelCard
+                  label="Error Rate"
+                  value={`${node.telemetry.errorRate}%`}
+                  trend={node.telemetry.errorRate > 1 ? "up" : "neutral"}
+                />
+              )}
+              {node.telemetry.lastSeen && (
+                <TelCard
+                  label="Last Seen"
+                  value={(() => { try { return new Date(node.telemetry!.lastSeen!).toLocaleTimeString(); } catch { return "—"; } })()}
+                />
+              )}
             </div>
           </div>
         )}
@@ -482,6 +492,7 @@ export function SystemMap() {
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [dataSource, setDataSource] = useState<"live" | "offline">("live");
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState(3);
   const { addToast } = useToast();
@@ -510,15 +521,35 @@ export function SystemMap() {
     setLastUpdated(new Date(data.lastUpdated));
   }, [setRfNodes, setRfEdges]);
 
+  const fetchTopology = useCallback(async () => {
+    const data = await aegisApi.getTopology();
+    if (data) {
+      loadTopology(data);
+      setDataSource("live");
+    } else {
+      setDataSource("offline");
+    }
+  }, [loadTopology]);
+
   // Initial load
   useEffect(() => {
-    aegisApi.getTopology().then(loadTopology);
-  }, [loadTopology]);
+    fetchTopology();
+  }, [fetchTopology]);
+
+  // Periodic live refresh every 12 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchTopology();
+    }, 12_000);
+    return () => clearInterval(interval);
+  }, [fetchTopology]);
 
   const handleDeepScan = async () => {
     setIsScanning(true);
     const data = await aegisApi.runDeepScan();
-    loadTopology(data);
+    if (data) {
+      loadTopology(data);
+    }
     setIsScanning(false);
     addToast({ title: "Deep scan complete", description: "Topology updated with latest findings.", variant: "info" });
   };
@@ -585,8 +616,10 @@ export function SystemMap() {
             )}
           </div>
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-monitoring/10 border border-monitoring/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-monitoring animate-pulse" />
-            <span className="text-[11px] font-medium text-monitoring">Monitoring Active</span>
+            <span className={cn("w-1.5 h-1.5 rounded-full", dataSource === "live" ? "bg-monitoring animate-pulse" : "bg-text-muted")} />
+            <span className={cn("text-[11px] font-medium", dataSource === "live" ? "text-monitoring" : "text-text-muted")}>
+              {dataSource === "live" ? "Live" : "Offline"}
+            </span>
           </div>
           <div className="hidden lg:block">
             <StatusBar nodes={topologyNodes} />

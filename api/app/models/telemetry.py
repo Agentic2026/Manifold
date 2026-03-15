@@ -23,6 +23,8 @@ class Container(Base):
     namespace: Mapped[str | None] = mapped_column(String, nullable=True)
     image: Mapped[str | None] = mapped_column(String, nullable=True)
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default='{}')
+    # Deterministic mapping to a topology node (compose service name)
+    topology_node_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class ContainerMetricSnapshot(Base):
@@ -33,5 +35,7 @@ class ContainerMetricSnapshot(Base):
     timestamp: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True))
     cpu_stats: Mapped[dict[str, Any]] = mapped_column(JSONB)
     memory_stats: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    network_stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    filesystem_stats: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 Index("ix_container_metric_snapshots_container_id_timestamp", ContainerMetricSnapshot.container_id, ContainerMetricSnapshot.timestamp)

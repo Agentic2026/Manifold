@@ -9,6 +9,9 @@
 # Required env vars (set in .env or shell):
 #   MANIFOLD_API_URL   – e.g. http://manifold-api:8000/cadvisor/batch
 #   MANIFOLD_API_TOKEN – bearer token matching the backend's CADVISOR_METRICS_API_TOKEN
+#
+# On Linux, host.docker.internal is resolved via extra_hosts below.
+# On Docker Desktop (macOS/Windows) the hostname works out of the box.
 
 services:
   cadvisor:
@@ -20,6 +23,8 @@ services:
     environment:
       CADVISOR_METRICS_API_URL: ${MANIFOLD_API_URL:-http://host.docker.internal:8000/cadvisor/batch}
       CADVISOR_METRICS_API_TOKEN: ${MANIFOLD_API_TOKEN:-my-secret-token}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro

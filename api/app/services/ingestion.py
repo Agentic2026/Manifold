@@ -6,6 +6,31 @@ from sqlalchemy.dialects.postgresql import insert
 from app.models.telemetry import Machine, Container, ContainerMetricSnapshot
 from app.schemas.cadvisor import CadvisorBatchPayloadSchema
 
+
+def _resolve_topology_node_id(sample) -> str | None:
+    """Deterministically resolve a topology node id from container metadata.
+
+    Priority:
+    1. ``com.docker.compose.service`` label  (set by Docker Compose)
+    2. First alias that is not the reference name
+    3. ``None`` – container stays unmatched
+    """
+    spec = sample.container_spec or {}
+    labels = spec.get("labels") or {}
+
+    compose_svc = labels.get("com.docker.compose.service")
+    if compose_svc:
+        return compose_svc
+
+    aliases = sample.container_reference.aliases or []
+    ref_name = sample.container_reference.name
+    for alias in aliases:
+        if alias != ref_name:
+            return alias
+
+    return None
+
+
 async def process_cadvisor_batch(payload: CadvisorBatchPayloadSchema, db: AsyncSession) -> int:
     # 1. UPSERT Machine
     stmt = insert(Machine).values(name=payload.machine_name).on_conflict_do_nothing()
@@ -28,6 +53,7 @@ async def process_cadvisor_batch(payload: CadvisorBatchPayloadSchema, db: AsyncS
             "namespace": sample.container_reference.namespace,
             "image": spec.get("image"),
             "labels": spec.get("labels", {}),
+            "topology_node_id": _resolve_topology_node_id(sample),
         })
     
     if not container_values:
@@ -42,6 +68,7 @@ async def process_cadvisor_batch(payload: CadvisorBatchPayloadSchema, db: AsyncS
             "namespace": stmt_containers.excluded.namespace,
             "image": stmt_containers.excluded.image,
             "labels": stmt_containers.excluded.labels,
+            "topology_node_id": stmt_containers.excluded.topology_node_id,
         }
     ).returning(Container.id, Container.reference_name)
     
@@ -72,6 +99,8 @@ async def process_cadvisor_batch(payload: CadvisorBatchPayloadSchema, db: AsyncS
             "timestamp": ts,
             "cpu_stats": stats.get("cpu", {}),
             "memory_stats": stats.get("memory", {}),
+            "network_stats": stats.get("network") or None,
+            "filesystem_stats": stats.get("filesystem") or None,
         })
     
     if snapshot_values:

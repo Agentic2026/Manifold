@@ -27,8 +27,9 @@ export type InsightType = "anomaly" | "threat" | "info";
 export interface NodeTelemetry {
   ingressMbps: number;
   egressMbps: number;
-  latencyMs: number;
-  errorRate: number;
+  latencyMs?: number | null;   // Not derivable from cAdvisor – may be null
+  errorRate?: number | null;    // Not derivable from cAdvisor – may be null
+  lastSeen?: string | null;
 }
 
 export interface NodeAnalysis {
@@ -500,16 +501,44 @@ async function fetchJSON<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * Fetch topology from the live backend.  Returns ``null`` when the backend
+ * is unreachable so the caller can decide how to handle the failure
+ * (instead of silently returning mock data).
+ */
+async function fetchTopologyLive(): Promise<TopologyData | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/topology`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as TopologyData;
+  } catch {
+    return null;
+  }
+}
+
 // ────────────────────────────────────────────────────────────
 // API client
 // ────────────────────────────────────────────────────────────
 
 export const aegisApi = {
-  /** Get the full topology graph (nodes + edges). */
-  getTopology: () => fetchJSON<TopologyData>("/api/topology", MOCK_TOPOLOGY),
+  /**
+   * Get the full topology graph (nodes + edges).
+   *
+   * In live mode (default) this returns ``null`` when the backend is
+   * unreachable.  Pass ``{ useMock: true }`` to explicitly opt into
+   * mock/demo data.
+   */
+  getTopology: async (opts?: { useMock?: boolean }): Promise<TopologyData | null> => {
+    const live = await fetchTopologyLive();
+    if (live) return live;
+    if (opts?.useMock) return MOCK_TOPOLOGY;
+    return null;
+  },
 
   /** Trigger a deep scan and return updated topology. */
-  runDeepScan: async (): Promise<TopologyData> => {
+  runDeepScan: async (): Promise<TopologyData | null> => {
     try {
       const res = await fetch(`${BASE_URL}/api/topology/scan`, {
         method: "POST",
@@ -517,9 +546,7 @@ export const aegisApi = {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return (await res.json()) as TopologyData;
     } catch {
-      // Simulate a short scan delay with mock data
-      await new Promise((r) => setTimeout(r, 2000));
-      return { ...MOCK_TOPOLOGY, lastUpdated: new Date().toISOString(), scanStatus: "complete" };
+      return null;
     }
   },
 
