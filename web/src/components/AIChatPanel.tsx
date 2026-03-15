@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   BrainCircuit,
   X,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useChat, type ChatMessage } from "../context/ChatContext";
 import { cn } from "../lib/utils";
+import { AssistantMarkdown } from "./chat/AssistantMarkdown";
 
 const SUGGESTED_PROMPTS = [
   "Analyze the current threat landscape",
@@ -16,82 +17,7 @@ const SUGGESTED_PROMPTS = [
   "What RBAC policies are at risk?",
 ];
 
-function renderMarkdown(text: string) {
-  // Lightweight markdown: paragraphs, bold, inline code, bullet lists
-  return text.split("\n\n").map((block, i) => {
-    // Check if block is a numbered or bullet list
-    const lines = block.split("\n");
-    const isList = lines.every(
-      (l) => /^\s*[-*]\s/.test(l) || /^\s*\d+\.\s/.test(l) || l.trim() === "",
-    );
-
-    if (isList) {
-      return (
-        <ul key={i} className="space-y-0.5 my-1">
-          {lines
-            .filter((l) => l.trim())
-            .map((line, j) => (
-              <li key={j} className="flex gap-1.5">
-                <span className="text-text-muted flex-shrink-0">
-                  {/^\s*\d+\./.test(line)
-                    ? line.match(/^\s*(\d+\.)/)?.[1]
-                    : "\u2022"}
-                </span>
-                <span>
-                  {renderInline(
-                    line.replace(/^\s*[-*]\s*/, "").replace(/^\s*\d+\.\s*/, ""),
-                  )}
-                </span>
-              </li>
-            ))}
-        </ul>
-      );
-    }
-
-    return (
-      <p key={i} className="my-1">
-        {renderInline(block)}
-      </p>
-    );
-  });
-}
-
-function renderInline(text: string) {
-  // Bold (**text**) and inline code (`code`)
-  const parts: React.ReactNode[] = [];
-  const regex = /(\*\*(.+?)\*\*|`([^`]+)`)/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push(text.slice(lastIdx, match.index));
-    }
-    if (match[2]) {
-      parts.push(
-        <strong key={match.index} className="font-semibold text-text">
-          {match[2]}
-        </strong>,
-      );
-    } else if (match[3]) {
-      parts.push(
-        <code
-          key={match.index}
-          className="font-mono text-[11px] bg-surface-alt px-1 py-0.5 rounded"
-        >
-          {match[3]}
-        </code>,
-      );
-    }
-    lastIdx = match.index + match[0].length;
-  }
-  if (lastIdx < text.length) {
-    parts.push(text.slice(lastIdx));
-  }
-  return <>{parts}</>;
-}
-
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message, isStreaming }: { message: ChatMessage; isStreaming?: boolean }) {
   const isUser = message.role === "user";
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -106,7 +32,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? (
           message.content
         ) : message.content ? (
-          <div className="prose-sm">{renderMarkdown(message.content)}</div>
+          <AssistantMarkdown markdown={message.content} isStreaming={isStreaming} />
         ) : (
           <TypingIndicator />
         )}
@@ -271,7 +197,13 @@ export function AIChatPanel() {
               </div>
             </div>
           ) : (
-            messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+            messages.map((msg, idx) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isStreaming={isStreaming && msg.role === "assistant" && idx === messages.length - 1}
+              />
+            ))
           )}
         </div>
 

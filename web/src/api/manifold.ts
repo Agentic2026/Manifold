@@ -99,6 +99,22 @@ export interface RBACPolicy {
   riskLevel: "low" | "medium" | "high";
 }
 
+export type ReportKind = "deep_scan" | "security_posture";
+export type MaxStatus = "healthy" | "warning" | "compromised";
+
+export interface SecurityReport {
+  id: string;
+  reportKind: ReportKind;
+  title: string;
+  summary: string;
+  detailsMarkdown: string;
+  createdAt: string;
+  maxStatus: MaxStatus;
+  fingerprint: string;
+  trigger: string;
+  payload: Record<string, unknown>;
+}
+
 // ────────────────────────────────────────────────────────────
 // Mock data
 // ────────────────────────────────────────────────────────────
@@ -557,6 +573,10 @@ export const manifoldApi = {
   /** Get LLM-generated insights. */
   getInsights: () =>
     fetchJSON<LLMInsight[]>("/insights", MOCK_INSIGHTS),
+
+  /** Get persisted scan/posture reports. */
+  getReports: () =>
+    fetchJSON<SecurityReport[]>("/reports", []),
 
   /** Get RBAC policies. */
   getRBACPolicies: () =>

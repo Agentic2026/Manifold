@@ -15,6 +15,7 @@ from app.models.topology import (
     Vulnerability as DBVuln,
     LLMInsight as DBInsight,
     RBACPolicy as DBRBAC,
+    SecurityReport as DBReport,
 )
 from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
@@ -111,6 +112,19 @@ class RBACPolicy(BaseModel):
 class SecurityScore(BaseModel):
     score: int
     breakdown: List[dict]
+
+
+class SecurityReportResponse(BaseModel):
+    id: str
+    reportKind: str  # "deep_scan" | "security_posture"
+    title: str
+    summary: str
+    detailsMarkdown: str
+    createdAt: str
+    maxStatus: str  # "healthy" | "warning" | "compromised"
+    fingerprint: str
+    trigger: str  # "manual" | "scheduled" | "api"
+    payload: Optional[dict] = None
 
 
 # ────────────────────────────────────────────────────────────
@@ -911,3 +925,27 @@ async def get_security_score(
     db: AsyncSession = Depends(get_db_session),
 ) -> SecurityScore:
     return await _compute_security_score(db)
+
+
+@router.get("/reports", response_model=List[SecurityReportResponse])
+async def get_reports(
+    db: AsyncSession = Depends(get_db_session),
+) -> List[SecurityReportResponse]:
+    q = await db.execute(
+        select(DBReport).order_by(DBReport.created_at.desc())
+    )
+    return [
+        SecurityReportResponse(
+            id=r.id,
+            reportKind=r.report_kind,
+            title=r.title,
+            summary=r.summary,
+            detailsMarkdown=r.details_markdown,
+            createdAt=r.created_at.isoformat(),
+            maxStatus=r.max_status,
+            fingerprint=r.fingerprint,
+            trigger=r.trigger,
+            payload=r.payload,
+        )
+        for r in q.scalars().all()
+    ]

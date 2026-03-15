@@ -7,6 +7,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     String,
+    Text,
 )
 from app.core.database import Base
 
@@ -117,3 +118,27 @@ class RBACPolicy(Base):
     scope = Column(String, nullable=False)
     last_modified = Column(DateTime(timezone=True), default=datetime.utcnow)
     risk_level = Column(String, nullable=False)  # e.g., "low", "medium", "high"
+
+
+class SecurityReport(Base):
+    """
+    Persisted deep-scan and security-posture reports.
+
+    Each /topology/scan invocation produces exactly two report rows:
+    one ``deep_scan`` and one ``security_posture``.  Even when nothing
+    materially changed, a report is stored with a stable fingerprint so
+    unchanged runs can be recognised.
+    """
+
+    __tablename__ = "security_reports"
+
+    id = Column(String, primary_key=True, index=True)
+    report_kind = Column(String, nullable=False)  # "deep_scan" | "security_posture"
+    title = Column(String, nullable=False)
+    summary = Column(String, nullable=False)
+    details_markdown = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    max_status = Column(String, nullable=False)  # "healthy" | "warning" | "compromised"
+    fingerprint = Column(String, nullable=False)  # stable hash of meaningful scan state
+    trigger = Column(String, nullable=False, default="manual")  # "manual" | "scheduled" | "api"
+    payload = Column(JSON, nullable=True)  # arbitrary structured metadata

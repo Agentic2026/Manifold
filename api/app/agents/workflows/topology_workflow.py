@@ -39,6 +39,7 @@ from app.models.topology import (
     TopologyNode,
     Vulnerability,
 )
+from app.services.report_generation import generate_reports
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +252,13 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
 
         if not evidence.get("nodes"):
             logger.info("No topology nodes found — skipping analysis")
-            return {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+            empty_result = {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+            try:
+                await generate_reports(db, empty_result, trigger="manual")
+                await db.commit()
+            except Exception as re:
+                logger.error("Report generation failed (no nodes): %s", re)
+            return empty_result
 
         # 2. Analyze
         analysis = await _analyze_with_llm(evidence)
@@ -263,7 +270,20 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
         applied = await _apply_verified_updates(db, verified)
         logger.info("Topology analysis applied: %s", applied)
 
-        return verified.model_dump()
+        result = verified.model_dump()
+
+        # 5. Generate reports
+        try:
+            await generate_reports(db, result, trigger="manual")
+            await db.commit()
+        except Exception as re:
+            logger.error("Report generation failed: %s", re)
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+        return result
 
     except Exception as e:
         logger.error("Topology workflow failed: %s", e)
@@ -271,4 +291,10 @@ async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
             await db.rollback()
         except Exception:
             pass
-        return {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+        err_result = {"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+        try:
+            await generate_reports(db, err_result, trigger="manual")
+            await db.commit()
+        except Exception as re:
+            logger.error("Report generation failed (error path): %s", re)
+        return err_result

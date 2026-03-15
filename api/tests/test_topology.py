@@ -34,6 +34,8 @@ async def override_get_db_session():
 
 
 from unittest.mock import patch, AsyncMock  # noqa: E402
+from app.models.topology import SecurityReport  # noqa: E402
+from app.services.report_generation import generate_reports  # noqa: E402
 
 app.dependency_overrides[get_db_session] = override_get_db_session
 
@@ -1266,3 +1268,154 @@ async def test_topology_node_id_in_spike_summaries():
     assert "mapproj__mapped" in result, (
         f"topology_node_id should appear in spike summary. Got:\n{result}"
     )
+
+
+# ────────────────────────────────────────────────────────────
+# Report generation tests
+# ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_report_generation_with_changes():
+    """Reports are created when a scan produces material changes."""
+    await _reset_tables()
+
+    # Seed topology so we have nodes
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        await ac.post("/topology/seed")
+
+    scan_result = {
+        "node_updates": [
+            {"node_id": "api-core", "new_status": "warning", "rationale": "high latency"},
+        ],
+        "new_vulnerabilities": [
+            {
+                "title": "Outdated dependency",
+                "severity": "high",
+                "affected_node_id": "api-core",
+                "description": "passport@0.4.1",
+            },
+        ],
+        "new_insights": [
+            {
+                "node_id": "api-core",
+                "insight_type": "threat",
+                "summary": "Egress anomaly",
+                "details": "Unusual outbound traffic",
+                "confidence": 0.85,
+            },
+        ],
+    }
+
+    async with TestSessionLocal() as session:
+        reports = await generate_reports(session, scan_result)
+        assert len(reports) == 2
+        kinds = {r.report_kind for r in reports}
+        assert kinds == {"deep_scan", "security_posture"}
+
+        deep = next(r for r in reports if r.report_kind == "deep_scan")
+        assert "1 status change" in deep.summary
+        assert "1 vulnerability" in deep.summary
+        assert "1 insight" in deep.summary
+        assert deep.trigger == "manual"
+        assert deep.fingerprint  # non-empty
+
+        posture = next(r for r in reports if r.report_kind == "security_posture")
+        assert posture.payload is not None
+        assert "score" in posture.payload
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_report_generation_no_changes():
+    """Reports are created even when the scan produces no material changes."""
+    await _reset_tables()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        await ac.post("/topology/seed")
+
+    empty_result = {
+        "node_updates": [],
+        "new_vulnerabilities": [],
+        "new_insights": [],
+    }
+
+    async with TestSessionLocal() as session:
+        reports = await generate_reports(session, empty_result)
+        assert len(reports) == 2
+        deep = next(r for r in reports if r.report_kind == "deep_scan")
+        assert "No material change" in deep.summary
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_reports_endpoint():
+    """GET /reports returns persisted reports."""
+    await _reset_tables()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        await ac.post("/topology/seed")
+
+    # Generate reports
+    async with TestSessionLocal() as session:
+        await generate_reports(
+            session,
+            {"node_updates": [], "new_vulnerabilities": [], "new_insights": []},
+        )
+        await session.commit()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.get("/reports")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+
+        # Check response shape
+        for item in data:
+            assert "id" in item
+            assert "reportKind" in item
+            assert "title" in item
+            assert "summary" in item
+            assert "detailsMarkdown" in item
+            assert "createdAt" in item
+            assert "maxStatus" in item
+            assert "fingerprint" in item
+            assert "trigger" in item
+
+
+@pytest.mark.asyncio
+async def test_report_fingerprint_stable():
+    """Same scan state should produce the same fingerprint."""
+    await _reset_tables()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        await ac.post("/topology/seed")
+
+    empty_result = {
+        "node_updates": [],
+        "new_vulnerabilities": [],
+        "new_insights": [],
+    }
+
+    async with TestSessionLocal() as session:
+        reports1 = await generate_reports(session, empty_result)
+        fp1_deep = next(r for r in reports1 if r.report_kind == "deep_scan").fingerprint
+        await session.commit()
+
+    # Generate again – deep_scan fingerprint for same empty result should match
+    async with TestSessionLocal() as session:
+        reports2 = await generate_reports(session, empty_result)
+        fp2_deep = next(r for r in reports2 if r.report_kind == "deep_scan").fingerprint
+        await session.commit()
+
+    assert fp1_deep == fp2_deep
