@@ -88,7 +88,7 @@ describe("buildFocusedGroupData", () => {
     const data = buildFocusedGroupData("g1", NODES, EDGES);
     // e1 (a1→a2) is internal, e2 (a2→b1) and e4 (u1→a1) are cross-group
     expect(data.internalEdges).toHaveLength(1);
-    expect(data.internalEdges[0].id).toBe("e1");
+    expect(data.internalEdges[0]!.id).toBe("e1");
     expect(data.crossGroupEdges).toHaveLength(2);
     expect(data.crossGroupEdges.map(e => e.id).sort()).toEqual(["e2", "e4"]);
   });
