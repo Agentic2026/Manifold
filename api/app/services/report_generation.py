@@ -126,7 +126,7 @@ async def generate_reports(
 
     if has_material_change:
         deep_title = "Deep Scan Report"
-        lines: list[str] = []
+        lines: List[str] = []
         if node_updates:
             lines.append("## Node Status Changes\n")
             for u in node_updates:

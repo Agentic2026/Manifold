@@ -34,6 +34,8 @@ async def override_get_db_session():
 
 
 from unittest.mock import patch, AsyncMock  # noqa: E402
+from app.models.topology import SecurityReport  # noqa: E402
+from app.services.report_generation import generate_reports  # noqa: E402
 
 app.dependency_overrides[get_db_session] = override_get_db_session
 
@@ -1271,9 +1273,6 @@ async def test_topology_node_id_in_spike_summaries():
 # ────────────────────────────────────────────────────────────
 # Report generation tests
 # ────────────────────────────────────────────────────────────
-
-from app.models.topology import SecurityReport  # noqa: E402
-from app.services.report_generation import generate_reports  # noqa: E402
 
 
 @pytest.mark.asyncio
