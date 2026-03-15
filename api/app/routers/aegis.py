@@ -840,7 +840,7 @@ def _derive_groups_from_node_ids(
         if "__" in nid:
             project, _ = nid.split("__", 1)
         else:
-            project = "__default__"
+            project = "ungrouped"
         gid = f"proj:{project}"
         if gid not in groups_map:
             groups_map[gid] = TopologyGroup(id=gid, label=project, kind="project")
@@ -926,8 +926,10 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
 
     edges = []
     for e in edges_q.scalars().all():
-        src_grp = node_group.get(e.source_id, (None,))[0]
-        tgt_grp = node_group.get(e.target_id, (None,))[0]
+        src_entry = node_group.get(e.source_id)
+        tgt_entry = node_group.get(e.target_id)
+        src_grp = src_entry[0] if src_entry else None
+        tgt_grp = tgt_entry[0] if tgt_entry else None
         edges.append(
             TopologyEdge(
                 id=e.id,

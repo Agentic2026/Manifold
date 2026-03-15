@@ -66,7 +66,7 @@ export function deriveGroupsFromNodes(
         });
       }
     } else if (n.id.includes("__")) {
-      const project = n.id.split("__")[0]!;
+      const project = n.id.split("__")[0] ?? n.id;
       const gid = `proj:${project}`;
       map.set(n.id, gid);
       if (!groupSet.has(gid)) {

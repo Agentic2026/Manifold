@@ -154,8 +154,8 @@ export function TopologyGraph({
 
     const q = searchQuery.toLowerCase();
     serviceNodes.forEach((node) => {
-      const label = (node.data("label") as string ?? "").toLowerCase();
-      const serviceId = (node.data("serviceId") as string ?? "").toLowerCase();
+      const label = String(node.data("label") ?? "").toLowerCase();
+      const serviceId = String(node.data("serviceId") ?? "").toLowerCase();
       const match = label.includes(q) || serviceId.includes(q);
       node.toggleClass("search-match", match);
       node.toggleClass("search-dimmed", !match);
