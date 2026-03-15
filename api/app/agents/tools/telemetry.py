@@ -57,20 +57,24 @@ def _extract_memory_bytes(memory_stats: dict) -> int | None:
 
 # ── Structured spike result ─────────────────────────────────
 
+from dataclasses import dataclass, asdict
+
+
+@dataclass
 class SpikeCandidate:
     """Lightweight container for a single container's spike data."""
-    __slots__ = (
-        "container_ref", "topology_node_id", "image", "aliases",
-        "cpu_delta_ns", "elapsed_seconds", "cpu_avg_cores",
-        "latest_memory_bytes", "memory_delta_bytes",
-    )
-
-    def __init__(self, **kwargs: Any):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+    container_ref: str
+    topology_node_id: str | None
+    image: str | None
+    aliases: list | None
+    cpu_delta_ns: int
+    elapsed_seconds: float
+    cpu_avg_cores: float
+    latest_memory_bytes: int
+    memory_delta_bytes: int
 
     def to_dict(self) -> Dict[str, Any]:
-        return {s: getattr(self, s, None) for s in self.__slots__}
+        return asdict(self)
 
     def summary_line(self) -> str:
         node = self.topology_node_id or "(unmapped)"
@@ -186,8 +190,10 @@ async def get_resource_spikes_structured(
             memory_delta_bytes=memory_delta_bytes,
         ))
 
-    # Filter to containers that show meaningful activity
-    # Threshold: >0.01 cores avg OR memory delta > 10 MB
+    # Filter to containers that show meaningful activity.
+    # Heuristic thresholds — tuned for typical containerized services:
+    # - >0.01 CPU cores average sustained utilization
+    # - >10 MB memory delta within the lookback window
     MEM_DELTA_THRESHOLD = 10 * 1024 * 1024  # 10 MB
     CPU_CORES_THRESHOLD = 0.01
 

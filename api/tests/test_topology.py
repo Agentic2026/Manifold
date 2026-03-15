@@ -701,12 +701,11 @@ async def test_spike_tool_nested_cpu_shape():
 
     # Must succeed without InvalidTextRepresentation or any crash
     assert isinstance(result, str)
-    # The result should mention the container or node
-    assert "spike" in result.lower() or "No significant" in result
-    # If there are spikes, verify the format is structured
-    if "spike" in result.lower():
-        assert "cpu_avg_cores=" in result
-        assert "mem_working_set_mb=" in result
+    # The 60B ns CPU delta over ~60s ≈ 1 core — should be detected as a spike
+    assert "spike" in result.lower(), f"Expected spikes to be detected. Got: {result}"
+    # Verify the format is structured
+    assert "cpu_avg_cores=" in result
+    assert "mem_working_set_mb=" in result
 
 
 # ────────────────────────────────────────────────────────────
@@ -848,9 +847,9 @@ async def test_network_rate_delta_semantics():
             egress = net_node["telemetry"]["egressMbps"]
 
             # Delta-based calculation:
-            # rx: 500_000 bytes / 30s = 16666 bytes/s → 0.133 Mbps
-            # tx: 200_000 bytes / 30s = 6666 bytes/s → 0.053 Mbps
-            # If we were using cumulative: rx would be ~2.8 Mbps — way too high
+            # rx: 500_000 bytes / 30s = 16,667 bytes/s → ~0.133 Mbps
+            # tx: 200_000 bytes / 30s = 6,667 bytes/s → ~0.053 Mbps
+            # If cumulative totals were used directly: rx=10.5M / 15s → ~5.6 Mbps
             assert ingress < 1.0, f"Ingress {ingress} Mbps looks like cumulative, not delta"
             assert egress < 1.0, f"Egress {egress} Mbps looks like cumulative, not delta"
             assert ingress > 0, "Ingress should be positive from delta"

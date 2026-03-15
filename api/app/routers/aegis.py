@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -13,6 +14,8 @@ from app.models.topology import TopologyNode as DBNode, TopologyEdge as DBEdge, 
 from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
 from app.services.discovery import reconcile_topology_from_containers
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["aegis"])
 
@@ -646,7 +649,8 @@ async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
     # Failures here must not prevent returning the topology graph.
     try:
         analysis_update = await run_topology_analysis(db)
-    except Exception:
+    except Exception as exc:
+        logger.error("Topology analysis failed during scan: %s", exc)
         # Ensure the session is clean for the subsequent topology fetch
         try:
             await db.rollback()
