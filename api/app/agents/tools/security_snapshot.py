@@ -52,7 +52,9 @@ def _spikes_to_anomalies(
                     topology_node_id=s.topology_node_id,
                     metric_type="cpu",
                     observed_value=round(s.cpu_avg_cores, 4),
-                    baseline_or_delta=round(s.cpu_delta_ns / 1e9, 2) if s.cpu_delta_ns else None,
+                    baseline_or_delta=round(s.cpu_delta_ns / 1e9, 2)
+                    if s.cpu_delta_ns
+                    else None,
                     unit="cores",
                     time_window_seconds=lookback,
                     severity_suggestion="warning" if s.cpu_avg_cores > 0.5 else "info",
@@ -136,9 +138,7 @@ async def get_security_snapshot(
     ]
 
     # RBAC
-    rq = await db.execute(
-        select(RBACPolicy).where(RBACPolicy.scope == node_id)
-    )
+    rq = await db.execute(select(RBACPolicy).where(RBACPolicy.scope == node_id))
     rbac = [
         {
             "role": r.role,
@@ -170,7 +170,9 @@ async def get_security_snapshot(
     if node_anomalies:
         summary_parts.append(f"{len(node_anomalies)} telemetry anomalies detected")
     if vulns:
-        summary_parts.append(f"{len(vulns)} vulnerabilities ({', '.join(v['severity'] for v in vulns)})")
+        summary_parts.append(
+            f"{len(vulns)} vulnerabilities ({', '.join(v['severity'] for v in vulns)})"
+        )
     if rbac:
         high_risk = [r for r in rbac if r["risk_level"] == "high"]
         if high_risk:
@@ -234,9 +236,7 @@ async def get_system_overview(
     ]
 
     # RBAC hotspots
-    rq = await db.execute(
-        select(RBACPolicy).where(RBACPolicy.risk_level == "high")
-    )
+    rq = await db.execute(select(RBACPolicy).where(RBACPolicy.risk_level == "high"))
     rbac_hotspots = [
         {"role": r.role, "subject": r.subject, "scope": r.scope}
         for r in rq.scalars().all()
@@ -247,7 +247,9 @@ async def get_system_overview(
     risky_nodes: list[NodeEvidence] = []
     for nid in risky_node_ids[:10]:  # cap at 10
         try:
-            ne = await get_security_snapshot(db, node_id=nid, lookback_seconds=lookback_seconds)
+            ne = await get_security_snapshot(
+                db, node_id=nid, lookback_seconds=lookback_seconds
+            )
             risky_nodes.append(ne)
         except Exception:
             pass
@@ -260,9 +262,7 @@ async def get_system_overview(
             + ", ".join(n.id for n in compromised_nodes[:5])
         )
     if high_vulns:
-        priorities.append(
-            f"Address {len(high_vulns)} high/critical vulnerability(ies)"
-        )
+        priorities.append(f"Address {len(high_vulns)} high/critical vulnerability(ies)")
     if warning_nodes:
         priorities.append(
             f"Monitor {len(warning_nodes)} warning node(s): "
@@ -337,7 +337,13 @@ async def get_recent_findings(
         vq_stmt = vq_stmt.where(Vulnerability.affected_node_id == node_id)
     vq = await db.execute(vq_stmt)
     vulns = [
-        {"id": v.id, "title": v.title, "severity": v.severity, "node": v.affected_node_id, "status": v.status}
+        {
+            "id": v.id,
+            "title": v.title,
+            "severity": v.severity,
+            "node": v.affected_node_id,
+            "status": v.status,
+        }
         for v in vq.scalars().all()
     ]
 
@@ -347,7 +353,13 @@ async def get_recent_findings(
         iq_stmt = iq_stmt.where(LLMInsight.node_id == node_id)
     iq = await db.execute(iq_stmt)
     insights = [
-        {"id": i.id, "type": i.type, "summary": i.summary, "node": i.node_id, "confidence": i.confidence}
+        {
+            "id": i.id,
+            "type": i.type,
+            "summary": i.summary,
+            "node": i.node_id,
+            "confidence": i.confidence,
+        }
         for i in iq.scalars().all()
     ]
 
@@ -388,39 +400,47 @@ async def get_remediation_candidates(
         vq_stmt = vq_stmt.where(Vulnerability.affected_node_id == node_id)
     vq = await db.execute(vq_stmt)
     for v in vq.scalars().all():
-        candidates.append({
-            "type": "vulnerability_fix",
-            "title": f"Remediate: {v.title}",
-            "severity": v.severity,
-            "affected_node": v.affected_node_id,
-            "evidence_ref": v.id,
-            "description": v.description,
-        })
+        candidates.append(
+            {
+                "type": "vulnerability_fix",
+                "title": f"Remediate: {v.title}",
+                "severity": v.severity,
+                "affected_node": v.affected_node_id,
+                "evidence_ref": v.id,
+                "description": v.description,
+            }
+        )
 
     # Warning/compromised nodes
-    nq_stmt = select(TopologyNode).where(TopologyNode.status.in_(["warning", "compromised"]))
+    nq_stmt = select(TopologyNode).where(
+        TopologyNode.status.in_(["warning", "compromised"])
+    )
     if node_id:
         nq_stmt = nq_stmt.where(TopologyNode.id == node_id)
     nq = await db.execute(nq_stmt)
     for n in nq.scalars().all():
         if n.status == "compromised":
-            candidates.append({
-                "type": "containment",
-                "title": f"Isolate compromised node: {n.label}",
-                "severity": "critical",
-                "affected_node": n.id,
-                "evidence_ref": f"node-status-{n.id}",
-                "description": f"Node {n.label} is marked as compromised. Immediate containment recommended.",
-            })
+            candidates.append(
+                {
+                    "type": "containment",
+                    "title": f"Isolate compromised node: {n.label}",
+                    "severity": "critical",
+                    "affected_node": n.id,
+                    "evidence_ref": f"node-status-{n.id}",
+                    "description": f"Node {n.label} is marked as compromised. Immediate containment recommended.",
+                }
+            )
         elif n.status == "warning":
-            candidates.append({
-                "type": "investigation",
-                "title": f"Investigate warning on: {n.label}",
-                "severity": "medium",
-                "affected_node": n.id,
-                "evidence_ref": f"node-status-{n.id}",
-                "description": f"Node {n.label} is in warning state. Further investigation recommended.",
-            })
+            candidates.append(
+                {
+                    "type": "investigation",
+                    "title": f"Investigate warning on: {n.label}",
+                    "severity": "medium",
+                    "affected_node": n.id,
+                    "evidence_ref": f"node-status-{n.id}",
+                    "description": f"Node {n.label} is in warning state. Further investigation recommended.",
+                }
+            )
 
     # High-risk RBAC
     rq_stmt = select(RBACPolicy).where(RBACPolicy.risk_level == "high")
@@ -428,13 +448,15 @@ async def get_remediation_candidates(
         rq_stmt = rq_stmt.where(RBACPolicy.scope == node_id)
     rq = await db.execute(rq_stmt)
     for r in rq.scalars().all():
-        candidates.append({
-            "type": "rbac_tightening",
-            "title": f"Review high-risk RBAC: {r.role} on {r.scope}",
-            "severity": "high",
-            "affected_node": r.scope,
-            "evidence_ref": r.id,
-            "description": f"Role '{r.role}' assigned to '{r.subject}' has high-risk permissions on scope '{r.scope}'.",
-        })
+        candidates.append(
+            {
+                "type": "rbac_tightening",
+                "title": f"Review high-risk RBAC: {r.role} on {r.scope}",
+                "severity": "high",
+                "affected_node": r.scope,
+                "evidence_ref": r.id,
+                "description": f"Role '{r.role}' assigned to '{r.subject}' has high-risk permissions on scope '{r.scope}'.",
+            }
+        )
 
     return candidates

@@ -9,23 +9,30 @@ from sqlalchemy.sql.sqltypes import JSON
 from app.main import app
 from app.core.database import get_db_session, Base
 
+
 # SQLite doesn't support JSONB, compile it as JSON (or Text)
 @compiles(JSONB, "sqlite")
 def compile_jsonb_sqlite(type_, compiler, **kw):
     return "JSON"
 
+
 @compiles(JSON, "sqlite")
 def compile_json_sqlite(type_, compiler, **kw):
     return "JSON"
 
+
 # Create an in-memory SQLite engine for testing
 test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-TestSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=test_engine, class_=AsyncSession)
+TestSessionLocal = async_sessionmaker(
+    autocommit=False, autoflush=False, bind=test_engine, class_=AsyncSession
+)
+
 
 async def override_get_db_session():
     # Only for tests, yield the session
     async with TestSessionLocal() as session:
         yield session
+
 
 app.dependency_overrides[get_db_session] = override_get_db_session
 
@@ -65,7 +72,11 @@ SAMPLE_BATCH_WITH_NET = {
     "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
     "samples": [
         {
-            "container_reference": {"name": "/manifold-api-1", "aliases": ["api"], "namespace": "docker"},
+            "container_reference": {
+                "name": "/manifold-api-1",
+                "aliases": ["api"],
+                "namespace": "docker",
+            },
             "container_spec": {
                 "image": "manifold-api:latest",
                 "labels": {
@@ -77,7 +88,11 @@ SAMPLE_BATCH_WITH_NET = {
                 "timestamp": "2024-01-15T12:34:56Z",
                 "cpu": {"usage": {"total": 123456789}},
                 "memory": {"usage": 67108864, "working_set": 50331648},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 5000000, "tx_bytes": 3000000}]},
+                "network": {
+                    "interfaces": [
+                        {"name": "eth0", "rx_bytes": 5000000, "tx_bytes": 3000000}
+                    ]
+                },
                 "filesystem": [{"device": "/dev/sda1", "usage": 1048576}],
             },
         }
@@ -96,6 +111,7 @@ async def _reset_tables():
 # Test: seed and fetch topology (existing)
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_topology_seed_and_fetch():
     """Verify that we can seed the topology and fetch it from DB."""
@@ -104,11 +120,16 @@ async def test_topology_seed_and_fetch():
     mock_run_analysis = AsyncMock(return_value={"status": "mocked"})
 
     with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Seed the DB
             response = await ac.post("/topology/seed")
             assert response.status_code == 200
-            assert response.json() in [{"status": "seeded"}, {"status": "already_seeded"}]
+            assert response.json() in [
+                {"status": "seeded"},
+                {"status": "already_seeded"},
+            ]
 
             # Fetch the topology
             topo_resp = await ac.get("/topology")
@@ -129,12 +150,15 @@ async def test_topology_seed_and_fetch():
 # Test: topology import from Docker Compose
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_topology_import():
     """POST a small compose example → verify nodes and edges are created."""
     await _reset_tables()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         resp = await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
         assert resp.status_code == 200
         body = resp.json()
@@ -156,13 +180,16 @@ async def test_topology_import():
 # Test: ingest with network/filesystem stats
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_ingest_network_filesystem_stats():
     """Verify network_stats and filesystem_stats are persisted."""
     await _reset_tables()
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             resp = await ac.post(
                 "/cadvisor/batch",
                 json=SAMPLE_BATCH_WITH_NET,
@@ -176,13 +203,16 @@ async def test_ingest_network_filesystem_stats():
 # Test: container-to-node correlation
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_container_to_node_correlation():
     """Ingest a container with compose.service label → verify topology_node_id set."""
     await _reset_tables()
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             resp = await ac.post(
                 "/cadvisor/batch",
                 json=SAMPLE_BATCH_WITH_NET,
@@ -193,8 +223,11 @@ async def test_container_to_node_correlation():
     # Verify the container record has project-scoped topology_node_id
     from app.models.telemetry import Container
     from sqlalchemy import select
+
     async with TestSessionLocal() as session:
-        result = await session.execute(select(Container).where(Container.reference_name == "/manifold-api-1"))
+        result = await session.execute(
+            select(Container).where(Container.reference_name == "/manifold-api-1")
+        )
         container = result.scalar_one()
         assert container.topology_node_id == "manifold__api"
 
@@ -203,12 +236,14 @@ async def test_container_to_node_correlation():
 # Test: /api/topology returns real telemetry for mapped nodes
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_topology_real_telemetry():
     """Import topology + ingest matching container → topology returns real telemetry."""
     await _reset_tables()
 
     from datetime import datetime, timezone
+
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     recent_batch = {
@@ -218,7 +253,11 @@ async def test_topology_real_telemetry():
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
         "samples": [
             {
-                "container_reference": {"name": "/manifold-api-1", "aliases": ["api"], "namespace": "docker"},
+                "container_reference": {
+                    "name": "/manifold-api-1",
+                    "aliases": ["api"],
+                    "namespace": "docker",
+                },
                 "container_spec": {
                     "image": "manifold-api:latest",
                     "labels": {"com.docker.compose.service": "api"},
@@ -227,7 +266,11 @@ async def test_topology_real_telemetry():
                     "timestamp": now_iso,
                     "cpu": {"usage": {"total": 123456789}},
                     "memory": {"usage": 67108864, "working_set": 50331648},
-                    "network": {"interfaces": [{"name": "eth0", "rx_bytes": 5000000, "tx_bytes": 3000000}]},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 5000000, "tx_bytes": 3000000}
+                        ]
+                    },
                     "filesystem": [{"device": "/dev/sda1", "usage": 1048576}],
                 },
             }
@@ -235,7 +278,9 @@ async def test_topology_real_telemetry():
     }
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Import topology first
             await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
 
@@ -274,6 +319,7 @@ async def test_topology_real_telemetry():
 # ────────────────────────────────────────────────────────────
 # Test: deterministic status engine (staleness rule)
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_status_engine_staleness():
@@ -320,7 +366,11 @@ MULTI_SERVICE_BATCH = {
     "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
     "samples": [
         {
-            "container_reference": {"name": "/myapp-web-1", "aliases": ["web"], "namespace": "docker"},
+            "container_reference": {
+                "name": "/myapp-web-1",
+                "aliases": ["web"],
+                "namespace": "docker",
+            },
             "container_spec": {
                 "image": "nginx:latest",
                 "labels": {
@@ -331,11 +381,17 @@ MULTI_SERVICE_BATCH = {
             "stats": {
                 "cpu": {"usage": {"total": 100000}},
                 "memory": {"usage": 10000000, "working_set": 8000000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 1000, "tx_bytes": 500}]},
+                "network": {
+                    "interfaces": [{"name": "eth0", "rx_bytes": 1000, "tx_bytes": 500}]
+                },
             },
         },
         {
-            "container_reference": {"name": "/myapp-api-1", "aliases": ["api"], "namespace": "docker"},
+            "container_reference": {
+                "name": "/myapp-api-1",
+                "aliases": ["api"],
+                "namespace": "docker",
+            },
             "container_spec": {
                 "image": "python:3.12",
                 "labels": {
@@ -346,11 +402,17 @@ MULTI_SERVICE_BATCH = {
             "stats": {
                 "cpu": {"usage": {"total": 200000}},
                 "memory": {"usage": 20000000, "working_set": 15000000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 2000, "tx_bytes": 1000}]},
+                "network": {
+                    "interfaces": [{"name": "eth0", "rx_bytes": 2000, "tx_bytes": 1000}]
+                },
             },
         },
         {
-            "container_reference": {"name": "/myapp-db-1", "aliases": ["db"], "namespace": "docker"},
+            "container_reference": {
+                "name": "/myapp-db-1",
+                "aliases": ["db"],
+                "namespace": "docker",
+            },
             "container_spec": {
                 "image": "postgres:16",
                 "labels": {
@@ -379,7 +441,9 @@ async def test_runtime_discovery_creates_topology_nodes():
         s["stats"]["timestamp"] = now_iso
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Ingest — no prior import
             resp = await ac.post(
                 "/cadvisor/batch",
@@ -414,7 +478,9 @@ async def test_runtime_discovery_topology_has_telemetry():
         s["stats"]["timestamp"] = now_iso
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             resp = await ac.post(
                 "/cadvisor/batch",
                 json=batch,
@@ -447,7 +513,9 @@ async def test_runtime_discovery_stable_across_ingests():
         s["stats"]["timestamp"] = now_iso
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Ingest twice
             for _ in range(2):
                 resp = await ac.post(
@@ -479,7 +547,9 @@ async def test_runtime_discovery_coexists_with_import():
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Import topology first (creates web, api, db, redis — unscoped)
             await ac.post("/topology/import", json={"yaml_content": SMALL_COMPOSE})
 
@@ -488,23 +558,37 @@ async def test_runtime_discovery_coexists_with_import():
                 "schema_version": "1",
                 "sent_at": now_iso,
                 "machine_name": "test-node",
-                "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-                "samples": [{
-                    "container_reference": {"name": "/proj-api-1", "aliases": ["api"], "namespace": "docker"},
-                    "container_spec": {
-                        "image": "python:3.12",
-                        "labels": {
-                            "com.docker.compose.service": "api",
-                            "com.docker.compose.project": "proj",
+                "source": {
+                    "component": "cadvisor",
+                    "driver": "httpapi",
+                    "version": "v0.50.0",
+                },
+                "samples": [
+                    {
+                        "container_reference": {
+                            "name": "/proj-api-1",
+                            "aliases": ["api"],
+                            "namespace": "docker",
                         },
-                    },
-                    "stats": {
-                        "timestamp": now_iso,
-                        "cpu": {"usage": {"total": 100}},
-                        "memory": {"usage": 1000, "working_set": 800},
-                        "network": {"interfaces": [{"name": "eth0", "rx_bytes": 500, "tx_bytes": 200}]},
-                    },
-                }],
+                        "container_spec": {
+                            "image": "python:3.12",
+                            "labels": {
+                                "com.docker.compose.service": "api",
+                                "com.docker.compose.project": "proj",
+                            },
+                        },
+                        "stats": {
+                            "timestamp": now_iso,
+                            "cpu": {"usage": {"total": 100}},
+                            "memory": {"usage": 1000, "working_set": 800},
+                            "network": {
+                                "interfaces": [
+                                    {"name": "eth0", "rx_bytes": 500, "tx_bytes": 200}
+                                ]
+                            },
+                        },
+                    }
+                ],
             }
             resp = await ac.post(
                 "/cadvisor/batch",
@@ -536,7 +620,9 @@ async def test_import_with_project_name_merges_with_runtime():
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Runtime discovery first — creates myapp__web, myapp__api, myapp__db
             batch = {**MULTI_SERVICE_BATCH, "sent_at": now_iso}
             for s in batch["samples"]:
@@ -548,10 +634,13 @@ async def test_import_with_project_name_merges_with_runtime():
             )
 
             # Import with matching project_name → should merge
-            await ac.post("/topology/import", json={
-                "yaml_content": SMALL_COMPOSE,
-                "project_name": "myapp",
-            })
+            await ac.post(
+                "/topology/import",
+                json={
+                    "yaml_content": SMALL_COMPOSE,
+                    "project_name": "myapp",
+                },
+            )
 
             topo = await ac.get("/topology")
             data = topo.json()
@@ -576,7 +665,9 @@ async def test_get_topology_empty_when_no_data():
     """GET /topology returns an empty graph when no containers have been ingested."""
     await _reset_tables()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         topo = await ac.get("/topology")
         assert topo.status_code == 200
         data = topo.json()
@@ -596,7 +687,9 @@ async def test_edge_generation_inferred_label():
         s["stats"]["timestamp"] = now_iso
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             await ac.post(
                 "/cadvisor/batch",
                 json=batch,
@@ -616,7 +709,9 @@ async def test_security_score_endpoint():
     """GET /api/security-score returns a valid score."""
     await _reset_tables()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         resp = await ac.get("/security-score")
         assert resp.status_code == 200
         data = resp.json()
@@ -628,6 +723,7 @@ async def test_security_score_endpoint():
 # ────────────────────────────────────────────────────────────
 # Regression: telemetry tool shape — nested CPU usage
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_spike_tool_nested_cpu_shape():
@@ -652,48 +748,82 @@ async def test_spike_tool_nested_cpu_shape():
         "sent_at": ts1,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/spike-test-1", "aliases": ["spike"], "namespace": "docker"},
-            "container_spec": {
-                "image": "spike:latest",
-                "labels": {
-                    "com.docker.compose.service": "spike",
-                    "com.docker.compose.project": "spikeproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/spike-test-1",
+                    "aliases": ["spike"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts1,
-                "cpu": {"usage": {"total": 1000000000, "user": 700000000, "system": 300000000}},
-                "memory": {"usage": 200000000, "working_set": 150000000},
-            },
-        }],
+                "container_spec": {
+                    "image": "spike:latest",
+                    "labels": {
+                        "com.docker.compose.service": "spike",
+                        "com.docker.compose.project": "spikeproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts1,
+                    "cpu": {
+                        "usage": {
+                            "total": 1000000000,
+                            "user": 700000000,
+                            "system": 300000000,
+                        }
+                    },
+                    "memory": {"usage": 200000000, "working_set": 150000000},
+                },
+            }
+        ],
     }
     batch2 = {
         "schema_version": "1",
         "sent_at": ts2,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/spike-test-1", "aliases": ["spike"], "namespace": "docker"},
-            "container_spec": {
-                "image": "spike:latest",
-                "labels": {
-                    "com.docker.compose.service": "spike",
-                    "com.docker.compose.project": "spikeproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/spike-test-1",
+                    "aliases": ["spike"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts2,
-                "cpu": {"usage": {"total": 61000000000, "user": 40000000000, "system": 21000000000}},
-                "memory": {"usage": 220000000, "working_set": 170000000},
-            },
-        }],
+                "container_spec": {
+                    "image": "spike:latest",
+                    "labels": {
+                        "com.docker.compose.service": "spike",
+                        "com.docker.compose.project": "spikeproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts2,
+                    "cpu": {
+                        "usage": {
+                            "total": 61000000000,
+                            "user": 40000000000,
+                            "system": 21000000000,
+                        }
+                    },
+                    "memory": {"usage": 220000000, "working_set": 170000000},
+                },
+            }
+        ],
     }
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
-            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch1,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch2,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
 
     # Now call get_resource_spikes_impl directly with a test session
     async with TestSessionLocal() as session:
@@ -712,6 +842,7 @@ async def test_spike_tool_nested_cpu_shape():
 # Regression: scan transaction recovery
 # ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_scan_transaction_recovery():
     """POST /topology/scan returns 200 even when spike extraction fails internally.
@@ -727,36 +858,55 @@ async def test_scan_transaction_recovery():
         "sent_at": now_iso,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/scan-test-1", "aliases": ["scantest"], "namespace": "docker"},
-            "container_spec": {
-                "image": "scantest:latest",
-                "labels": {
-                    "com.docker.compose.service": "scantest",
-                    "com.docker.compose.project": "scanproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/scan-test-1",
+                    "aliases": ["scantest"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": now_iso,
-                "cpu": {"usage": {"total": 123456789, "user": 100000000, "system": 23456789}},
-                "memory": {"usage": 67108864, "working_set": 50331648},
-            },
-        }],
+                "container_spec": {
+                    "image": "scantest:latest",
+                    "labels": {
+                        "com.docker.compose.service": "scantest",
+                        "com.docker.compose.project": "scanproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": now_iso,
+                    "cpu": {
+                        "usage": {
+                            "total": 123456789,
+                            "user": 100000000,
+                            "system": 23456789,
+                        }
+                    },
+                    "memory": {"usage": 67108864, "working_set": 50331648},
+                },
+            }
+        ],
     }
 
-    mock_run_analysis = AsyncMock(return_value={"node_updates": [], "new_vulnerabilities": [], "new_insights": []})
+    mock_run_analysis = AsyncMock(
+        return_value={"node_updates": [], "new_vulnerabilities": [], "new_insights": []}
+    )
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Ingest data with nested CPU shape
             resp = await ac.post(
-                "/cadvisor/batch", json=batch,
+                "/cadvisor/batch",
+                json=batch,
                 headers={"Authorization": f"Bearer {VALID_TOKEN}"},
             )
             assert resp.status_code == 202
 
             # Run scan (mocked LLM)
-            with patch("app.routers.aegis.run_topology_analysis", new=mock_run_analysis):
+            with patch(
+                "app.routers.aegis.run_topology_analysis", new=mock_run_analysis
+            ):
                 scan_resp = await ac.post("/topology/scan")
                 assert scan_resp.status_code == 200
                 scan_data = scan_resp.json()
@@ -770,6 +920,7 @@ async def test_scan_transaction_recovery():
 # ────────────────────────────────────────────────────────────
 # Regression: network rate delta semantics
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_network_rate_delta_semantics():
@@ -790,56 +941,88 @@ async def test_network_rate_delta_semantics():
         "sent_at": ts1,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/nettest-1", "aliases": ["nettest"], "namespace": "docker"},
-            "container_spec": {
-                "image": "nettest:latest",
-                "labels": {
-                    "com.docker.compose.service": "nettest",
-                    "com.docker.compose.project": "netproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/nettest-1",
+                    "aliases": ["nettest"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts1,
-                "cpu": {"usage": {"total": 100}},
-                "memory": {"usage": 1000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 10000000, "tx_bytes": 5000000}]},
-            },
-        }],
+                "container_spec": {
+                    "image": "nettest:latest",
+                    "labels": {
+                        "com.docker.compose.service": "nettest",
+                        "com.docker.compose.project": "netproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts1,
+                    "cpu": {"usage": {"total": 100}},
+                    "memory": {"usage": 1000},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 10000000, "tx_bytes": 5000000}
+                        ]
+                    },
+                },
+            }
+        ],
     }
     batch2 = {
         "schema_version": "1",
         "sent_at": ts2,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/nettest-1", "aliases": ["nettest"], "namespace": "docker"},
-            "container_spec": {
-                "image": "nettest:latest",
-                "labels": {
-                    "com.docker.compose.service": "nettest",
-                    "com.docker.compose.project": "netproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/nettest-1",
+                    "aliases": ["nettest"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts2,
-                "cpu": {"usage": {"total": 200}},
-                "memory": {"usage": 1000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 10500000, "tx_bytes": 5200000}]},
-            },
-        }],
+                "container_spec": {
+                    "image": "nettest:latest",
+                    "labels": {
+                        "com.docker.compose.service": "nettest",
+                        "com.docker.compose.project": "netproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts2,
+                    "cpu": {"usage": {"total": 200}},
+                    "memory": {"usage": 1000},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 10500000, "tx_bytes": 5200000}
+                        ]
+                    },
+                },
+            }
+        ],
     }
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
-            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch1,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch2,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
 
             topo = await ac.get("/topology")
             assert topo.status_code == 200
             data = topo.json()
 
-            net_node = next((n for n in data["nodes"] if n["id"] == "netproj__nettest"), None)
+            net_node = next(
+                (n for n in data["nodes"] if n["id"] == "netproj__nettest"), None
+            )
             assert net_node is not None, "netproj__nettest node should exist"
             assert net_node["telemetry"] is not None
 
@@ -850,8 +1033,12 @@ async def test_network_rate_delta_semantics():
             # rx: 500_000 bytes / 30s = 16,667 bytes/s → ~0.133 Mbps
             # tx: 200_000 bytes / 30s = 6,667 bytes/s → ~0.053 Mbps
             # If cumulative totals were used directly: rx=10.5M / 15s → ~5.6 Mbps
-            assert ingress < 1.0, f"Ingress {ingress} Mbps looks like cumulative, not delta"
-            assert egress < 1.0, f"Egress {egress} Mbps looks like cumulative, not delta"
+            assert ingress < 1.0, (
+                f"Ingress {ingress} Mbps looks like cumulative, not delta"
+            )
+            assert egress < 1.0, (
+                f"Egress {egress} Mbps looks like cumulative, not delta"
+            )
             assert ingress > 0, "Ingress should be positive from delta"
             assert egress > 0, "Egress should be positive from delta"
 
@@ -859,6 +1046,7 @@ async def test_network_rate_delta_semantics():
 # ────────────────────────────────────────────────────────────
 # Regression: security score consistency with topology
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_security_score_reflects_topology_warning():
@@ -882,50 +1070,78 @@ async def test_security_score_reflects_topology_warning():
         "sent_at": ts1,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/highegress-1", "aliases": ["highegress"], "namespace": "docker"},
-            "container_spec": {
-                "image": "highegress:latest",
-                "labels": {
-                    "com.docker.compose.service": "highegress",
-                    "com.docker.compose.project": "egressproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/highegress-1",
+                    "aliases": ["highegress"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts1,
-                "cpu": {"usage": {"total": 100}},
-                "memory": {"usage": 1000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 0, "tx_bytes": 0}]},
-            },
-        }],
+                "container_spec": {
+                    "image": "highegress:latest",
+                    "labels": {
+                        "com.docker.compose.service": "highegress",
+                        "com.docker.compose.project": "egressproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts1,
+                    "cpu": {"usage": {"total": 100}},
+                    "memory": {"usage": 1000},
+                    "network": {
+                        "interfaces": [{"name": "eth0", "rx_bytes": 0, "tx_bytes": 0}]
+                    },
+                },
+            }
+        ],
     }
     batch2 = {
         "schema_version": "1",
         "sent_at": ts2,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/highegress-1", "aliases": ["highegress"], "namespace": "docker"},
-            "container_spec": {
-                "image": "highegress:latest",
-                "labels": {
-                    "com.docker.compose.service": "highegress",
-                    "com.docker.compose.project": "egressproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/highegress-1",
+                    "aliases": ["highegress"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts2,
-                "cpu": {"usage": {"total": 200}},
-                "memory": {"usage": 1000},
-                "network": {"interfaces": [{"name": "eth0", "rx_bytes": 0, "tx_bytes": 1000000000}]},
-            },
-        }],
+                "container_spec": {
+                    "image": "highegress:latest",
+                    "labels": {
+                        "com.docker.compose.service": "highegress",
+                        "com.docker.compose.project": "egressproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts2,
+                    "cpu": {"usage": {"total": 200}},
+                    "memory": {"usage": 1000},
+                    "network": {
+                        "interfaces": [
+                            {"name": "eth0", "rx_bytes": 0, "tx_bytes": 1000000000}
+                        ]
+                    },
+                },
+            }
+        ],
     }
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
-            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch1,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch2,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
 
             # Topology should show the node as 'warning' (high egress)
             topo = await ac.get("/topology")
@@ -950,17 +1166,17 @@ async def test_security_score_reflects_topology_warning():
             )
             # Check the breakdown mentions warning nodes
             warning_entries = [
-                b for b in score_data["breakdown"]
+                b
+                for b in score_data["breakdown"]
                 if "warning" in b.get("label", "").lower()
             ]
-            assert len(warning_entries) > 0, (
-                "Breakdown should mention warning nodes"
-            )
+            assert len(warning_entries) > 0, "Breakdown should mention warning nodes"
 
 
 # ────────────────────────────────────────────────────────────
 # Regression: topology_node_id in anomaly summaries
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_topology_node_id_in_spike_summaries():
@@ -979,48 +1195,70 @@ async def test_topology_node_id_in_spike_summaries():
         "sent_at": ts1,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/mapped-svc-1", "aliases": ["mapped"], "namespace": "docker"},
-            "container_spec": {
-                "image": "mapped:latest",
-                "labels": {
-                    "com.docker.compose.service": "mapped",
-                    "com.docker.compose.project": "mapproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/mapped-svc-1",
+                    "aliases": ["mapped"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts1,
-                "cpu": {"usage": {"total": 1000000000}},
-                "memory": {"usage": 100000000, "working_set": 80000000},
-            },
-        }],
+                "container_spec": {
+                    "image": "mapped:latest",
+                    "labels": {
+                        "com.docker.compose.service": "mapped",
+                        "com.docker.compose.project": "mapproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts1,
+                    "cpu": {"usage": {"total": 1000000000}},
+                    "memory": {"usage": 100000000, "working_set": 80000000},
+                },
+            }
+        ],
     }
     batch2 = {
         "schema_version": "1",
         "sent_at": ts2,
         "machine_name": "test-node",
         "source": {"component": "cadvisor", "driver": "httpapi", "version": "v0.50.0"},
-        "samples": [{
-            "container_reference": {"name": "/mapped-svc-1", "aliases": ["mapped"], "namespace": "docker"},
-            "container_spec": {
-                "image": "mapped:latest",
-                "labels": {
-                    "com.docker.compose.service": "mapped",
-                    "com.docker.compose.project": "mapproj",
+        "samples": [
+            {
+                "container_reference": {
+                    "name": "/mapped-svc-1",
+                    "aliases": ["mapped"],
+                    "namespace": "docker",
                 },
-            },
-            "stats": {
-                "timestamp": ts2,
-                "cpu": {"usage": {"total": 61000000000}},
-                "memory": {"usage": 120000000, "working_set": 100000000},
-            },
-        }],
+                "container_spec": {
+                    "image": "mapped:latest",
+                    "labels": {
+                        "com.docker.compose.service": "mapped",
+                        "com.docker.compose.project": "mapproj",
+                    },
+                },
+                "stats": {
+                    "timestamp": ts2,
+                    "cpu": {"usage": {"total": 61000000000}},
+                    "memory": {"usage": 120000000, "working_set": 100000000},
+                },
+            }
+        ],
     }
 
     with patch("app.core.config.settings.cadvisor_metrics_api_token", VALID_TOKEN):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            await ac.post("/cadvisor/batch", json=batch1, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
-            await ac.post("/cadvisor/batch", json=batch2, headers={"Authorization": f"Bearer {VALID_TOKEN}"})
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch1,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
+            await ac.post(
+                "/cadvisor/batch",
+                json=batch2,
+                headers={"Authorization": f"Bearer {VALID_TOKEN}"},
+            )
 
     async with TestSessionLocal() as session:
         result = await get_resource_spikes_impl(lookback_seconds=300, db=session)

@@ -10,7 +10,13 @@ from sqlalchemy.future import select
 from sqlalchemy import delete, func
 
 from app.core.database import get_db_session
-from app.models.topology import TopologyNode as DBNode, TopologyEdge as DBEdge, Vulnerability as DBVuln, LLMInsight as DBInsight, RBACPolicy as DBRBAC
+from app.models.topology import (
+    TopologyNode as DBNode,
+    TopologyEdge as DBEdge,
+    Vulnerability as DBVuln,
+    LLMInsight as DBInsight,
+    RBACPolicy as DBRBAC,
+)
 from app.models.telemetry import Container, ContainerMetricSnapshot
 from app.agents.topology import run_topology_analysis
 from app.services.discovery import reconcile_topology_from_containers
@@ -31,8 +37,8 @@ _last_reconcile_ts: float = 0.0
 class NodeTelemetry(BaseModel):
     ingressMbps: float
     egressMbps: float
-    latencyMs: Optional[float] = None   # Not derivable from cAdvisor today
-    errorRate: Optional[float] = None    # Not derivable from cAdvisor today
+    latencyMs: Optional[float] = None  # Not derivable from cAdvisor today
+    errorRate: Optional[float] = None  # Not derivable from cAdvisor today
     lastSeen: Optional[str] = None
 
 
@@ -122,6 +128,7 @@ def _iso(delta_hours: float = 0) -> str:
 def _iso_days(delta_days: int = 0) -> str:
     return (_now - timedelta(days=delta_days)).isoformat()
 
+
 MOCK_NODES: List[TopologyNode] = [
     TopologyNode(
         id="ext-lb",
@@ -189,14 +196,64 @@ MOCK_NODES: List[TopologyNode] = [
 ]
 
 MOCK_EDGES: List[TopologyEdge] = [
-    TopologyEdge(id="e-ext-web", source="ext-lb", target="web-front", kind="network", label="NETWORK: public:443"),
-    TopologyEdge(id="e-web-auth", source="web-front", target="auth-svc", kind="api", label="API: service_account:auth_read"),
-    TopologyEdge(id="e-web-api", source="web-front", target="api-core", kind="api", label="API: frontend_role"),
-    TopologyEdge(id="e-ext-api", source="ext-lb", target="api-core", kind="api", label="API: public:443 → internal:8080"),
-    TopologyEdge(id="e-auth-db", source="auth-svc", target="db-main", kind="network", label="NETWORK: db_auth_admin"),
-    TopologyEdge(id="e-api-db", source="api-core", target="db-main", kind="network", label="NETWORK: db_api_rw"),
-    TopologyEdge(id="e-api-agent", source="api-core", target="llm-agent", kind="api", label="mcp_bridge_role", animated=True),
-    TopologyEdge(id="e-agent-vector", source="llm-agent", target="db-vector", kind="api", label="vector_read_role", animated=True),
+    TopologyEdge(
+        id="e-ext-web",
+        source="ext-lb",
+        target="web-front",
+        kind="network",
+        label="NETWORK: public:443",
+    ),
+    TopologyEdge(
+        id="e-web-auth",
+        source="web-front",
+        target="auth-svc",
+        kind="api",
+        label="API: service_account:auth_read",
+    ),
+    TopologyEdge(
+        id="e-web-api",
+        source="web-front",
+        target="api-core",
+        kind="api",
+        label="API: frontend_role",
+    ),
+    TopologyEdge(
+        id="e-ext-api",
+        source="ext-lb",
+        target="api-core",
+        kind="api",
+        label="API: public:443 → internal:8080",
+    ),
+    TopologyEdge(
+        id="e-auth-db",
+        source="auth-svc",
+        target="db-main",
+        kind="network",
+        label="NETWORK: db_auth_admin",
+    ),
+    TopologyEdge(
+        id="e-api-db",
+        source="api-core",
+        target="db-main",
+        kind="network",
+        label="NETWORK: db_api_rw",
+    ),
+    TopologyEdge(
+        id="e-api-agent",
+        source="api-core",
+        target="llm-agent",
+        kind="api",
+        label="mcp_bridge_role",
+        animated=True,
+    ),
+    TopologyEdge(
+        id="e-agent-vector",
+        source="llm-agent",
+        target="db-vector",
+        kind="api",
+        label="vector_read_role",
+        animated=True,
+    ),
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -212,6 +269,7 @@ _EGRESS_WARNING_MBPS = 50.0
 
 class ComposeImportRequest(BaseModel):
     """Accepts raw Docker Compose YAML for topology import."""
+
     yaml_content: str
     project_name: Optional[str] = None
 
@@ -275,15 +333,17 @@ def _parse_compose_to_topology(
 
         scoped = _scope_id(svc_name)
         source_label = f"project: {project_name}" if project_name else "Docker Compose"
-        nodes.append({
-            "id": scoped,
-            "label": svc_name,
-            "service_id": svc_name,
-            "status": "healthy",
-            "type": _guess_type(svc_name, svc),
-            "position": {"x": 60 + col * COL_WIDTH, "y": 60 + row * ROW_HEIGHT},
-            "description": f"Imported from {source_label}.{ports_desc}",
-        })
+        nodes.append(
+            {
+                "id": scoped,
+                "label": svc_name,
+                "service_id": svc_name,
+                "status": "healthy",
+                "type": _guess_type(svc_name, svc),
+                "position": {"x": 60 + col * COL_WIDTH, "y": 60 + row * ROW_HEIGHT},
+                "description": f"Imported from {source_label}.{ports_desc}",
+            }
+        )
 
         # Edges from depends_on — labeled as declared
         depends = svc.get("depends_on") or []
@@ -292,14 +352,16 @@ def _parse_compose_to_topology(
         for dep in depends:
             edge_id = f"declared-{_scope_id(svc_name)}-{_scope_id(dep)}"
             if edge_id not in seen_edges and dep in services:
-                edges.append({
-                    "id": edge_id,
-                    "source_id": _scope_id(svc_name),
-                    "target_id": _scope_id(dep),
-                    "kind": "declared",
-                    "label": "declared: depends_on",
-                    "animated": False,
-                })
+                edges.append(
+                    {
+                        "id": edge_id,
+                        "source_id": _scope_id(svc_name),
+                        "target_id": _scope_id(dep),
+                        "kind": "declared",
+                        "label": "declared: depends_on",
+                        "animated": False,
+                    }
+                )
                 seen_edges.add(edge_id)
 
     # Edges from shared networks — labeled with network name
@@ -315,17 +377,19 @@ def _parse_compose_to_topology(
 
     for net_name, members in network_members.items():
         for i, a in enumerate(members):
-            for b in members[i + 1:]:
+            for b in members[i + 1 :]:
                 edge_id = f"declared-net-{net_name}-{a}-{b}"
                 if edge_id not in seen_edges:
-                    edges.append({
-                        "id": edge_id,
-                        "source_id": a,
-                        "target_id": b,
-                        "kind": "declared",
-                        "label": f"declared: shared network ({net_name})",
-                        "animated": False,
-                    })
+                    edges.append(
+                        {
+                            "id": edge_id,
+                            "source_id": a,
+                            "target_id": b,
+                            "kind": "declared",
+                            "label": f"declared: shared network ({net_name})",
+                            "animated": False,
+                        }
+                    )
                     seen_edges.add(edge_id)
 
     return nodes, edges
@@ -361,7 +425,10 @@ async def _aggregate_node_telemetry(
             ContainerMetricSnapshot.container_id.in_(container_ids),
             ContainerMetricSnapshot.timestamp >= cutoff,
         )
-        .order_by(ContainerMetricSnapshot.container_id, ContainerMetricSnapshot.timestamp.desc())
+        .order_by(
+            ContainerMetricSnapshot.container_id,
+            ContainerMetricSnapshot.timestamp.desc(),
+        )
     )
     snapshots = snapshots_q.scalars().all()
     if not snapshots:
@@ -383,6 +450,7 @@ async def _aggregate_node_telemetry(
 
     # Group by container_id → find the two most recent snapshots for delta
     from collections import defaultdict
+
     per_container: dict[int, list] = defaultdict(list)
     for snap in snapshots:
         per_container[snap.container_id].append(snap)
@@ -416,8 +484,8 @@ async def _aggregate_node_telemetry(
     return NodeTelemetry(
         ingressMbps=ingress,
         egressMbps=egress,
-        latencyMs=None,    # Not derivable from cAdvisor
-        errorRate=None,     # Not derivable from cAdvisor
+        latencyMs=None,  # Not derivable from cAdvisor
+        errorRate=None,  # Not derivable from cAdvisor
         lastSeen=latest_ts.isoformat() if latest_ts else None,
     )
 
@@ -490,24 +558,46 @@ async def _compute_security_score(db: AsyncSession) -> SecurityScore:
     warning = sum(1 for _, s, _ in node_statuses if s == "warning")
     if compromised:
         impact = -20 * compromised
-        breakdown.append({"label": f"{compromised} compromised node{'s' if compromised > 1 else ''}", "impact": impact})
+        breakdown.append(
+            {
+                "label": f"{compromised} compromised node{'s' if compromised > 1 else ''}",
+                "impact": impact,
+            }
+        )
         score += impact
     if warning:
         impact = -10 * warning
-        breakdown.append({"label": f"{warning} warning node{'s' if warning > 1 else ''}", "impact": impact})
+        breakdown.append(
+            {
+                "label": f"{warning} warning node{'s' if warning > 1 else ''}",
+                "impact": impact,
+            }
+        )
         score += impact
 
     vulns_q = await db.execute(select(DBVuln))
     vulns = vulns_q.scalars().all()
-    crit_vulns = sum(1 for v in vulns if v.severity == "critical" and v.status == "open")
+    crit_vulns = sum(
+        1 for v in vulns if v.severity == "critical" and v.status == "open"
+    )
     high_vulns = sum(1 for v in vulns if v.severity == "high" and v.status == "open")
     if crit_vulns:
         impact = -8 * crit_vulns
-        breakdown.append({"label": f"{crit_vulns} critical vuln{'s' if crit_vulns > 1 else ''}", "impact": impact})
+        breakdown.append(
+            {
+                "label": f"{crit_vulns} critical vuln{'s' if crit_vulns > 1 else ''}",
+                "impact": impact,
+            }
+        )
         score += impact
     if high_vulns:
         impact = -5 * high_vulns
-        breakdown.append({"label": f"{high_vulns} high vuln{'s' if high_vulns > 1 else ''}", "impact": impact})
+        breakdown.append(
+            {
+                "label": f"{high_vulns} high vuln{'s' if high_vulns > 1 else ''}",
+                "impact": impact,
+            }
+        )
         score += impact
 
     rbac_q = await db.execute(select(DBRBAC))
@@ -530,24 +620,39 @@ async def _compute_security_score(db: AsyncSession) -> SecurityScore:
 async def seed_topology(db: AsyncSession = Depends(get_db_session)) -> dict:
     """Creates the tables and seeds them with initial data if empty."""
     from app.core.database import Base
+
     # Create the tables if they don't exist
     conn = await db.connection()
     await conn.run_sync(Base.metadata.create_all)
-    
+
     # Check if empty
     res = await db.execute(select(DBNode).limit(1))
     if res.scalar_one_or_none():
         return {"status": "already_seeded"}
-        
+
     for n in MOCK_NODES:
-        db.add(DBNode(
-            id=n.id, label=n.label, service_id=n.serviceId, status=n.status, type=n.type,
-            position=n.position, description=n.description
-        ))
+        db.add(
+            DBNode(
+                id=n.id,
+                label=n.label,
+                service_id=n.serviceId,
+                status=n.status,
+                type=n.type,
+                position=n.position,
+                description=n.description,
+            )
+        )
     for e in MOCK_EDGES:
-        db.add(DBEdge(
-            id=e.id, source_id=e.source, target_id=e.target, kind=e.kind, label=e.label, animated=e.animated
-        ))
+        db.add(
+            DBEdge(
+                id=e.id,
+                source_id=e.source,
+                target_id=e.target,
+                kind=e.kind,
+                label=e.label,
+                animated=e.animated,
+            )
+        )
     await db.commit()
     return {"status": "seeded"}
 
@@ -575,20 +680,28 @@ async def import_topology(
 
     # Upsert nodes — merge with existing runtime-discovered nodes
     for nd in node_dicts:
-        stmt = pg_insert(DBNode).values(**nd).on_conflict_do_update(
-            index_elements=["id"],
-            set_={
-                "description": nd.get("description"),
-                "type": nd.get("type"),
-                # Preserve existing status and position from runtime
-            },
+        stmt = (
+            pg_insert(DBNode)
+            .values(**nd)
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "description": nd.get("description"),
+                    "type": nd.get("type"),
+                    # Preserve existing status and position from runtime
+                },
+            )
         )
         await db.execute(stmt)
 
     # Upsert edges — add declared edges without removing inferred ones
     for ed in edge_dicts:
-        stmt = pg_insert(DBEdge).values(**ed).on_conflict_do_nothing(
-            index_elements=["id"],
+        stmt = (
+            pg_insert(DBEdge)
+            .values(**ed)
+            .on_conflict_do_nothing(
+                index_elements=["id"],
+            )
         )
         await db.execute(stmt)
 
@@ -604,6 +717,7 @@ async def import_topology(
 @router.get("/topology", response_model=TopologyData)
 async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyData:
     import time as _time
+
     global _last_reconcile_ts
 
     # Lazy reconciliation: if topology is empty, attempt to rebuild from
@@ -619,27 +733,41 @@ async def get_topology(db: AsyncSession = Depends(get_db_session)) -> TopologyDa
     # We already fetched nodes check above; now use the shared helper
     node_statuses = await _compute_effective_node_statuses(db)
     edges_q = await db.execute(select(DBEdge))
-    
+
     nodes = []
     for n, status, telem in node_statuses:
-        nodes.append(TopologyNode(
-            id=n.id, label=n.label, serviceId=n.service_id, status=status, type=n.type,
-            position=n.position, description=n.description,
-            telemetry=telem,
-            analysis=n.analysis if isinstance(n.analysis, dict) else None,
-        ))
-        
+        nodes.append(
+            TopologyNode(
+                id=n.id,
+                label=n.label,
+                serviceId=n.service_id,
+                status=status,
+                type=n.type,
+                position=n.position,
+                description=n.description,
+                telemetry=telem,
+                analysis=n.analysis if isinstance(n.analysis, dict) else None,
+            )
+        )
+
     edges = []
     for e in edges_q.scalars().all():
-        edges.append(TopologyEdge(
-            id=e.id, source=e.source_id, target=e.target_id, kind=e.kind, label=e.label, animated=e.animated
-        ))
-        
+        edges.append(
+            TopologyEdge(
+                id=e.id,
+                source=e.source_id,
+                target=e.target_id,
+                kind=e.kind,
+                label=e.label,
+                animated=e.animated,
+            )
+        )
+
     return TopologyData(
         nodes=nodes,
         edges=edges,
         lastUpdated=datetime.now(UTC).isoformat(),
-        scanStatus="idle"
+        scanStatus="idle",
     )
 
 
@@ -656,7 +784,7 @@ async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
             await db.rollback()
         except Exception:
             pass
-    
+
     # Return topology with scanning status true (frontend usually polls afterward)
     topo = await get_topology(db)
     topo.scanStatus = "complete"
@@ -664,7 +792,9 @@ async def run_scan(db: AsyncSession = Depends(get_db_session)) -> dict:
 
 
 @router.post("/topology/{node_id}/isolate")
-async def isolate_node(node_id: str, db: AsyncSession = Depends(get_db_session)) -> dict:
+async def isolate_node(
+    node_id: str, db: AsyncSession = Depends(get_db_session)
+) -> dict:
     """Soft-isolate a node (simulated).
 
     Persists an "isolated" status on the node so the state is visible
@@ -676,27 +806,41 @@ async def isolate_node(node_id: str, db: AsyncSession = Depends(get_db_session))
     node = result.scalar_one_or_none()
     if node is None:
         return {
-            "success": False, "nodeId": node_id, "action": "isolate",
-            "simulated": True, "detail": "Node not found",
+            "success": False,
+            "nodeId": node_id,
+            "action": "isolate",
+            "simulated": True,
+            "detail": "Node not found",
         }
     node.status = "isolated"
     await db.commit()
     return {
-        "success": True, "nodeId": node_id, "action": "isolate",
+        "success": True,
+        "nodeId": node_id,
+        "action": "isolate",
         "simulated": True,
         "detail": "Node status set to isolated (simulated — no real network isolation)",
     }
 
 
 @router.get("/vulnerabilities", response_model=List[Vulnerability])
-async def get_vulnerabilities(db: AsyncSession = Depends(get_db_session)) -> List[Vulnerability]:
+async def get_vulnerabilities(
+    db: AsyncSession = Depends(get_db_session),
+) -> List[Vulnerability]:
     q = await db.execute(select(DBVuln))
     return [
         Vulnerability(
-            id=v.id, title=v.title, severity=v.severity, affectedNode=v.affected_node_id,
-            affectedNodeId=v.affected_node_id, description=v.description, 
-            discoveredAt=v.discovered_at.isoformat(), status=v.status, cve=v.cve
-        ) for v in q.scalars().all()
+            id=v.id,
+            title=v.title,
+            severity=v.severity,
+            affectedNode=v.affected_node_id,
+            affectedNodeId=v.affected_node_id,
+            description=v.description,
+            discoveredAt=v.discovered_at.isoformat(),
+            status=v.status,
+            cve=v.cve,
+        )
+        for v in q.scalars().all()
     ]
 
 
@@ -705,9 +849,16 @@ async def get_insights(db: AsyncSession = Depends(get_db_session)) -> List[LLMIn
     q = await db.execute(select(DBInsight))
     return [
         LLMInsight(
-            id=i.id, nodeId=i.node_id, nodeName=i.node_id, type=i.type, summary=i.summary,
-            details=i.details, timestamp=i.timestamp.isoformat(), confidence=i.confidence
-        ) for i in q.scalars().all()
+            id=i.id,
+            nodeId=i.node_id,
+            nodeName=i.node_id,
+            type=i.type,
+            summary=i.summary,
+            details=i.details,
+            timestamp=i.timestamp.isoformat(),
+            confidence=i.confidence,
+        )
+        for i in q.scalars().all()
     ]
 
 
@@ -716,9 +867,15 @@ async def get_rbac(db: AsyncSession = Depends(get_db_session)) -> List[RBACPolic
     q = await db.execute(select(DBRBAC))
     return [
         RBACPolicy(
-            id=r.id, role=r.role, subject=r.subject, permissions=r.permissions,
-            scope=r.scope, lastModified=r.last_modified.isoformat(), riskLevel=r.risk_level
-        ) for r in q.scalars().all()
+            id=r.id,
+            role=r.role,
+            subject=r.subject,
+            permissions=r.permissions,
+            scope=r.scope,
+            lastModified=r.last_modified.isoformat(),
+            riskLevel=r.risk_level,
+        )
+        for r in q.scalars().all()
     ]
 
 
@@ -734,18 +891,25 @@ async def revoke_rbac(node_id: str, db: AsyncSession = Depends(get_db_session)) 
     node = result.scalar_one_or_none()
     if node is None:
         return {
-            "success": False, "nodeId": node_id, "action": "rbac_revoke",
-            "simulated": True, "detail": "Node not found",
+            "success": False,
+            "nodeId": node_id,
+            "action": "rbac_revoke",
+            "simulated": True,
+            "detail": "Node not found",
         }
     node.status = "compromised"
     await db.commit()
     return {
-        "success": True, "nodeId": node_id, "action": "rbac_revoke",
+        "success": True,
+        "nodeId": node_id,
+        "action": "rbac_revoke",
         "simulated": True,
         "detail": "Node status set to compromised, RBAC revoked (simulated)",
     }
 
 
 @router.get("/security-score", response_model=SecurityScore)
-async def get_security_score(db: AsyncSession = Depends(get_db_session)) -> SecurityScore:
+async def get_security_score(
+    db: AsyncSession = Depends(get_db_session),
+) -> SecurityScore:
     return await _compute_security_score(db)

@@ -11,6 +11,7 @@ from app.agents.tools.telemetry import (
 # Unit tests for JSON extraction helpers
 # ────────────────────────────────────────────────────────────
 
+
 def test_extract_cpu_total_nested():
     """cpu_stats = {usage: {total: N}} — standard cAdvisor shape."""
     assert _extract_cpu_total({"usage": {"total": 123456789}}) == 123456789
@@ -54,6 +55,7 @@ def test_extract_memory_missing():
 # Integration test for get_resource_spikes_impl using real DB
 # (see test_topology.py for full integration tests)
 # ────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_agent_tool_get_resource_spikes_empty_db():

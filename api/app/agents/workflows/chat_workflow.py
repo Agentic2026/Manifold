@@ -158,7 +158,10 @@ async def stream_chat_workflow(
     intent = classify_intent(user_msg, has_node_context=bool(node_id))
 
     # ── 2. Gather evidence ──
-    yield {"event": "message", "data": json.dumps({"token": ""})}  # keep connection alive
+    yield {
+        "event": "message",
+        "data": json.dumps({"token": ""}),
+    }  # keep connection alive
 
     evidence = await _gather_evidence(intent, db, node_id=node_id)
     evidence_context = _build_evidence_context(evidence)
@@ -222,7 +225,9 @@ async def stream_chat_workflow(
             "Evidence gathering completed but LLM synthesis failed."
         )
         if has_evidence:
-            error_msg += " Internal evidence was available but could not be synthesized."
+            error_msg += (
+                " Internal evidence was available but could not be synthesized."
+            )
         yield {"event": "message", "data": json.dumps({"token": error_msg})}
         accumulated_answer = error_msg
 

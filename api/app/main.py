@@ -44,7 +44,9 @@ async def _ensure_tables() -> None:
         # Non-PostgreSQL backends (e.g. SQLite in e2e tests) may not support
         # JSONB columns.  The h4ckath0n auth tables are created separately by
         # the framework lifespan; telemetry/topology simply won't be available.
-        logger.warning("Could not create telemetry/topology tables (expected on SQLite).")
+        logger.warning(
+            "Could not create telemetry/topology tables (expected on SQLite)."
+        )
     except Exception:
         logger.exception("Failed to create tables.")
     _tables_created = True

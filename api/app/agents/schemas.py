@@ -29,7 +29,9 @@ class TelemetryAnomaly(BaseModel):
     baseline_or_delta: Optional[float] = Field(
         default=None, description="Baseline or delta value for comparison"
     )
-    unit: str = Field(default="", description="Unit of measurement (e.g. 'cores', 'MB', 'Mbps')")
+    unit: str = Field(
+        default="", description="Unit of measurement (e.g. 'cores', 'MB', 'Mbps')"
+    )
     time_window_seconds: int = Field(description="Lookback window in seconds")
     severity_suggestion: str = Field(
         default="info",
@@ -82,7 +84,9 @@ class RemediationAction(BaseModel):
     title: str
     rationale: str
     affected_nodes: List[str] = Field(default_factory=list)
-    priority: str = Field(default="medium", description="'critical', 'high', 'medium', 'low'")
+    priority: str = Field(
+        default="medium", description="'critical', 'high', 'medium', 'low'"
+    )
     evidence_refs: List[str] = Field(
         default_factory=list, description="Evidence IDs supporting this action"
     )

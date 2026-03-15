@@ -32,7 +32,9 @@ def _to_psycopg(url: str) -> str:
 
 
 class Settings(BaseSettings):
-    h4ckath0n_database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/manifold"
+    h4ckath0n_database_url: str = (
+        "postgresql+psycopg://postgres:postgres@localhost:5432/manifold"
+    )
     cadvisor_metrics_api_token: str = "my-secret-token"
 
     model_config = SettingsConfigDict(

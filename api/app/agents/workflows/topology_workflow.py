@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 # ── LLM structured output schema ────────────────────────────
 # This mirrors TopologyAnalysisResult but is used for with_structured_output
 
+
 class LLMNodeUpdate(BaseModel):
     id: str = Field(description="TopologyNode ID to update")
     status: str = Field(description="'healthy', 'warning', or 'compromised'")
@@ -55,6 +56,7 @@ class LLMNodeUpdate(BaseModel):
         default_factory=list,
         description="Evidence IDs supporting this change",
     )
+
 
 class LLMVulnerability(BaseModel):
     title: str
@@ -66,6 +68,7 @@ class LLMVulnerability(BaseModel):
         description="Evidence IDs supporting this vulnerability",
     )
 
+
 class LLMInsightOutput(BaseModel):
     node_id: str
     type: str = Field(description="'anomaly', 'threat', or 'info'")
@@ -74,6 +77,7 @@ class LLMInsightOutput(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     evidence_refs: List[str] = Field(default_factory=list)
 
+
 class LLMImpactAnalysis(BaseModel):
     node_updates: List[LLMNodeUpdate] = Field(default_factory=list)
     new_vulnerabilities: List[LLMVulnerability] = Field(default_factory=list)
@@ -81,6 +85,7 @@ class LLMImpactAnalysis(BaseModel):
 
 
 # ── Workflow stages ──────────────────────────────────────────
+
 
 async def _fetch_evidence(db: AsyncSession) -> Dict[str, Any]:
     """Gather structured evidence for topology analysis."""
@@ -145,7 +150,9 @@ async def _analyze_with_llm(evidence: Dict[str, Any]) -> TopologyAnalysisResult:
     )
 
     try:
-        result: LLMImpactAnalysis = await llm.ainvoke([SystemMessage(content=full_prompt)])
+        result: LLMImpactAnalysis = await llm.ainvoke(
+            [SystemMessage(content=full_prompt)]
+        )
 
         # Convert to shared schema
         return TopologyAnalysisResult(
@@ -229,6 +236,7 @@ async def _apply_verified_updates(
 
 
 # ── Main entrypoint ──────────────────────────────────────────
+
 
 async def run_topology_workflow(db: AsyncSession) -> Dict[str, Any]:
     """Execute the full topology analysis workflow.

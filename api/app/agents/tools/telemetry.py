@@ -11,6 +11,7 @@ from app.models.telemetry import Container, ContainerMetricSnapshot
 
 # ── JSON helpers ────────────────────────────────────────────
 
+
 def _extract_cpu_total(cpu_stats: dict) -> int | None:
     """Extract cumulative CPU usage nanoseconds from stored cpu_stats.
 
@@ -63,6 +64,7 @@ from dataclasses import dataclass, asdict
 @dataclass
 class SpikeCandidate:
     """Lightweight container for a single container's spike data."""
+
     container_ref: str
     topology_node_id: str | None
     image: str | None
@@ -78,8 +80,16 @@ class SpikeCandidate:
 
     def summary_line(self) -> str:
         node = self.topology_node_id or "(unmapped)"
-        mem_mb = round(self.latest_memory_bytes / (1024 * 1024), 1) if self.latest_memory_bytes else 0
-        mem_delta_mb = round(self.memory_delta_bytes / (1024 * 1024), 1) if self.memory_delta_bytes else 0
+        mem_mb = (
+            round(self.latest_memory_bytes / (1024 * 1024), 1)
+            if self.latest_memory_bytes
+            else 0
+        )
+        mem_delta_mb = (
+            round(self.memory_delta_bytes / (1024 * 1024), 1)
+            if self.memory_delta_bytes
+            else 0
+        )
         cpu_cores = round(self.cpu_avg_cores, 3) if self.cpu_avg_cores else 0
         return (
             f"Node {node} (container {self.container_ref}): "
@@ -90,6 +100,7 @@ class SpikeCandidate:
 
 
 # ── Core implementation ─────────────────────────────────────
+
 
 async def get_resource_spikes_impl(
     lookback_seconds: int,
@@ -133,7 +144,9 @@ async def get_resource_spikes_structured(
         )
         .join(Container, ContainerMetricSnapshot.container_id == Container.id)
         .where(ContainerMetricSnapshot.timestamp >= cutoff)
-        .order_by(ContainerMetricSnapshot.container_id, ContainerMetricSnapshot.timestamp)
+        .order_by(
+            ContainerMetricSnapshot.container_id, ContainerMetricSnapshot.timestamp
+        )
     )
 
     result = await db.execute(stmt)
@@ -176,19 +189,25 @@ async def get_resource_spikes_structured(
         mem_first = _extract_memory_bytes(first.memory_stats or {})
         mem_last = _extract_memory_bytes(last.memory_stats or {})
         latest_memory_bytes = mem_last or 0
-        memory_delta_bytes = (mem_last - mem_first) if (mem_last is not None and mem_first is not None) else 0
+        memory_delta_bytes = (
+            (mem_last - mem_first)
+            if (mem_last is not None and mem_first is not None)
+            else 0
+        )
 
-        candidates.append(SpikeCandidate(
-            container_ref=first.reference_name,
-            topology_node_id=first.topology_node_id,
-            image=first.image,
-            aliases=first.aliases,
-            cpu_delta_ns=cpu_delta_ns,
-            elapsed_seconds=elapsed,
-            cpu_avg_cores=cpu_avg_cores,
-            latest_memory_bytes=latest_memory_bytes,
-            memory_delta_bytes=memory_delta_bytes,
-        ))
+        candidates.append(
+            SpikeCandidate(
+                container_ref=first.reference_name,
+                topology_node_id=first.topology_node_id,
+                image=first.image,
+                aliases=first.aliases,
+                cpu_delta_ns=cpu_delta_ns,
+                elapsed_seconds=elapsed,
+                cpu_avg_cores=cpu_avg_cores,
+                latest_memory_bytes=latest_memory_bytes,
+                memory_delta_bytes=memory_delta_bytes,
+            )
+        )
 
     # Filter to containers that show meaningful activity.
     # Heuristic thresholds — tuned for typical containerized services:
@@ -198,16 +217,21 @@ async def get_resource_spikes_structured(
     CPU_CORES_THRESHOLD = 0.01
 
     candidates = [
-        c for c in candidates
+        c
+        for c in candidates
         if c.cpu_avg_cores > CPU_CORES_THRESHOLD
         or abs(c.memory_delta_bytes) > MEM_DELTA_THRESHOLD
     ]
 
-    candidates.sort(key=lambda c: (c.cpu_avg_cores, abs(c.memory_delta_bytes)), reverse=True)
+    candidates.sort(
+        key=lambda c: (c.cpu_avg_cores, abs(c.memory_delta_bytes)), reverse=True
+    )
     return candidates[:15]
 
 
-def _format_spike_results(candidates: List[SpikeCandidate], lookback_seconds: int) -> str:
+def _format_spike_results(
+    candidates: List[SpikeCandidate], lookback_seconds: int
+) -> str:
     if not candidates:
         return f"No significant resource spikes detected in the last {lookback_seconds} seconds."
 
@@ -215,6 +239,7 @@ def _format_spike_results(candidates: List[SpikeCandidate], lookback_seconds: in
     for c in candidates:
         lines.append(f" - {c.summary_line()}")
     return "\n".join(lines)
+
 
 @tool
 async def get_resource_spikes(lookback_seconds: int) -> str:

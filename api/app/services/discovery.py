@@ -71,6 +71,7 @@ def _grid_position(index: int) -> dict[str, int]:
 
 # ── Shared-network extraction ──────────────────────────────
 
+
 def _extract_shared_networks(containers: list[Container]) -> dict[str, list[str]]:
     """Build a mapping of network name → list of topology_node_ids.
 
@@ -99,6 +100,7 @@ def _extract_shared_networks(containers: list[Container]) -> dict[str, list[str]
 
 
 # ── Core discovery ──────────────────────────────────────────
+
 
 async def reconcile_topology_from_containers(db: AsyncSession) -> int:
     """Upsert topology nodes and inferred edges from current containers.
@@ -143,23 +145,27 @@ async def reconcile_topology_from_containers(db: AsyncSession) -> int:
         svc_type = _guess_service_type(svc_name, rep_image)
         position = _grid_position(idx)
 
-        stmt = pg_insert(DBNode).values(
-            id=scoped_id,
-            label=svc_name,
-            service_id=svc_name,
-            status="healthy",
-            type=svc_type,
-            position=position,
-            description=f"Auto-discovered from runtime metadata (project: {project}).",
-        ).on_conflict_do_update(
-            index_elements=["id"],
-            set_={
-                "label": svc_name,
-                "service_id": svc_name,
-                "type": svc_type,
-                # Preserve existing position to avoid layout jumps
-                # Preserve existing status (will be recomputed on GET)
-            },
+        stmt = (
+            pg_insert(DBNode)
+            .values(
+                id=scoped_id,
+                label=svc_name,
+                service_id=svc_name,
+                status="healthy",
+                type=svc_type,
+                position=position,
+                description=f"Auto-discovered from runtime metadata (project: {project}).",
+            )
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "label": svc_name,
+                    "service_id": svc_name,
+                    "type": svc_type,
+                    # Preserve existing position to avoid layout jumps
+                    # Preserve existing status (will be recomputed on GET)
+                },
+            )
         )
         await db.execute(stmt)
 
@@ -172,7 +178,7 @@ async def reconcile_topology_from_containers(db: AsyncSession) -> int:
     network_pairs: dict[tuple[str, str], list[str]] = defaultdict(list)
     for net_name, members in network_map.items():
         for i, a in enumerate(members):
-            for b in members[i + 1:]:
+            for b in members[i + 1 :]:
                 pair = (min(a, b), max(a, b))
                 network_pairs[pair].append(net_name)
 
@@ -182,7 +188,7 @@ async def reconcile_topology_from_containers(db: AsyncSession) -> int:
         # Sort for deterministic edge generation
         members_sorted = sorted(members)
         for i, src in enumerate(members_sorted):
-            for tgt in members_sorted[i + 1:]:
+            for tgt in members_sorted[i + 1 :]:
                 pair = (min(src, tgt), max(src, tgt))
                 shared_nets = network_pairs.get(pair, [])
 
@@ -192,14 +198,18 @@ async def reconcile_topology_from_containers(db: AsyncSession) -> int:
                     edge_label = f"inferred: same project ({project})"
 
                 edge_id = f"inferred-{project}-{src}-{tgt}"
-                stmt = pg_insert(DBEdge).values(
-                    id=edge_id,
-                    source_id=src,
-                    target_id=tgt,
-                    kind="inferred",
-                    label=edge_label,
-                    animated=False,
-                ).on_conflict_do_nothing(index_elements=["id"])
+                stmt = (
+                    pg_insert(DBEdge)
+                    .values(
+                        id=edge_id,
+                        source_id=src,
+                        target_id=tgt,
+                        kind="inferred",
+                        label=edge_label,
+                        animated=False,
+                    )
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
                 await db.execute(stmt)
 
     await db.commit()

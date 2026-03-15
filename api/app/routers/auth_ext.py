@@ -5,6 +5,7 @@ from h4ckath0n.auth import require_user
 
 router = APIRouter(prefix="/auth", tags=["auth_ext"])
 
+
 class SessionResponse(BaseModel):
     user_id: str
     device_id: str
@@ -12,6 +13,7 @@ class SessionResponse(BaseModel):
     scopes: List[str]
     display_name: Optional[str] = None
     email: Optional[str] = None
+
 
 @router.get("/session", response_model=SessionResponse)
 def get_session(user: Any = Depends(require_user)) -> SessionResponse:

@@ -36,18 +36,46 @@ VALID_TOKEN = "test-secret-123"
 async def _seed_topology(session: AsyncSession):
     """Insert a minimal topology (web→api→db) directly into the test DB."""
     nodes = [
-        TopologyNode(id="web", label="web", service_id="web", status="healthy",
-                     type="frontend", position={"x": 0, "y": 0}),
-        TopologyNode(id="api", label="api", service_id="api", status="healthy",
-                     type="service", position={"x": 100, "y": 0}),
-        TopologyNode(id="db", label="db", service_id="db", status="healthy",
-                     type="database", position={"x": 200, "y": 0}),
+        TopologyNode(
+            id="web",
+            label="web",
+            service_id="web",
+            status="healthy",
+            type="frontend",
+            position={"x": 0, "y": 0},
+        ),
+        TopologyNode(
+            id="api",
+            label="api",
+            service_id="api",
+            status="healthy",
+            type="service",
+            position={"x": 100, "y": 0},
+        ),
+        TopologyNode(
+            id="db",
+            label="db",
+            service_id="db",
+            status="healthy",
+            type="database",
+            position={"x": 200, "y": 0},
+        ),
     ]
     edges = [
-        TopologyEdge(id="e-web-api", source_id="web", target_id="api",
-                     kind="network", label="web→api"),
-        TopologyEdge(id="e-api-db", source_id="api", target_id="db",
-                     kind="network", label="api→db"),
+        TopologyEdge(
+            id="e-web-api",
+            source_id="web",
+            target_id="api",
+            kind="network",
+            label="web→api",
+        ),
+        TopologyEdge(
+            id="e-api-db",
+            source_id="api",
+            target_id="db",
+            kind="network",
+            label="api→db",
+        ),
     ]
     for n in nodes:
         session.add(n)
@@ -59,6 +87,7 @@ async def _seed_topology(session: AsyncSession):
 # ═══════════════════════════════════════════════════════════════
 # 1. Shared schemas
 # ═══════════════════════════════════════════════════════════════
+
 
 def test_schemas_telemetry_anomaly():
     """TelemetryAnomaly schema constructs and serializes."""
@@ -130,6 +159,7 @@ def test_schemas_topology_result():
 # 2. Shared policy consistency
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_policy_base_contains_evidence_first():
     """The base policy requires evidence-first reasoning."""
     from app.agents.policies import BASE_SECURITY_POLICY
@@ -162,10 +192,14 @@ def test_policy_topology_overlay_shares_severity_rules():
 # 3. Intent routing
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_intent_routing_threat_landscape():
     from app.agents.runtime import classify_intent
 
-    assert classify_intent("Analyze the current threat landscape") == "system_threat_landscape"
+    assert (
+        classify_intent("Analyze the current threat landscape")
+        == "system_threat_landscape"
+    )
     assert classify_intent("What's the system status?") == "system_threat_landscape"
 
 
@@ -180,7 +214,9 @@ def test_intent_routing_node_context():
     from app.agents.runtime import classify_intent
 
     # When node context is present, default to node_investigation
-    assert classify_intent("Tell me more", has_node_context=True) == "node_investigation"
+    assert (
+        classify_intent("Tell me more", has_node_context=True) == "node_investigation"
+    )
     # Without context, default to general_followup
     assert classify_intent("Tell me more", has_node_context=False) == "general_followup"
 
@@ -200,6 +236,7 @@ def test_intent_routing_rbac():
 # ═══════════════════════════════════════════════════════════════
 # 4. Verification
 # ═══════════════════════════════════════════════════════════════
+
 
 def test_verify_chat_answer_with_evidence():
     from app.agents.runtime import verify_chat_answer
@@ -309,6 +346,7 @@ def test_verify_topology_drops_ungrounded_vulnerabilities():
 # 5. Conversation memory / thread continuity
 # ═══════════════════════════════════════════════════════════════
 
+
 def test_thread_memory_stores_and_retrieves():
     from app.agents.runtime import store_message, get_thread_history, clear_thread
 
@@ -328,7 +366,12 @@ def test_thread_memory_stores_and_retrieves():
 
 
 def test_thread_memory_bounded():
-    from app.agents.runtime import store_message, get_thread_history, clear_thread, MAX_HISTORY_PER_THREAD
+    from app.agents.runtime import (
+        store_message,
+        get_thread_history,
+        clear_thread,
+        MAX_HISTORY_PER_THREAD,
+    )
 
     clear_thread("test-thread-2")
     for i in range(MAX_HISTORY_PER_THREAD + 10):
@@ -342,6 +385,7 @@ def test_thread_memory_bounded():
 # ═══════════════════════════════════════════════════════════════
 # 6. Composite evidence tools
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_security_snapshot_unknown_node():
@@ -438,6 +482,7 @@ async def test_recent_findings_empty():
 # 7. Chat workflow grounding (mocked LLM)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_chat_threat_landscape_gathers_evidence():
     """Chat 'Analyze the threat landscape' gathers system evidence and streams."""
@@ -450,6 +495,7 @@ async def test_chat_threat_landscape_gathers_evidence():
     async def mock_astream(messages):
         class FakeChunk:
             content = "Based on internal evidence, the system has 3 nodes, all healthy."
+
         yield FakeChunk()
 
     with patch("app.agents.workflows.chat_workflow.ChatOpenAI") as MockLLM:
@@ -459,6 +505,7 @@ async def test_chat_threat_landscape_gathers_evidence():
         events = []
         async with TestSessionLocal() as session:
             from app.agents.workflows.chat_workflow import stream_chat_workflow
+
             async for ev in stream_chat_workflow(
                 "Analyze the current threat landscape",
                 context=None,
@@ -471,10 +518,10 @@ async def test_chat_threat_landscape_gathers_evidence():
     data_events = [e for e in events if e.get("event") == "message"]
     assert len(data_events) >= 1
     # The mocked LLM response should appear in the stream
-    all_tokens = "".join(
-        json.loads(e["data"]).get("token", "") for e in data_events
+    all_tokens = "".join(json.loads(e["data"]).get("token", "") for e in data_events)
+    assert "3 nodes" in all_tokens, (
+        f"Expected '3 nodes' in streamed output, got: {all_tokens!r}"
     )
-    assert "3 nodes" in all_tokens, f"Expected '3 nodes' in streamed output, got: {all_tokens!r}"
 
 
 @pytest.mark.asyncio
@@ -488,6 +535,7 @@ async def test_chat_node_context_uses_snapshot():
     async def mock_astream(messages):
         class FakeChunk:
             content = "Node api is healthy with no anomalies."
+
         yield FakeChunk()
 
     with patch("app.agents.workflows.chat_workflow.ChatOpenAI") as MockLLM:
@@ -497,9 +545,14 @@ async def test_chat_node_context_uses_snapshot():
         events = []
         async with TestSessionLocal() as session:
             from app.agents.workflows.chat_workflow import stream_chat_workflow
+
             async for ev in stream_chat_workflow(
                 "Investigate this node",
-                context={"nodeId": "api", "nodeName": "API Service", "status": "healthy"},
+                context={
+                    "nodeId": "api",
+                    "nodeName": "API Service",
+                    "status": "healthy",
+                },
                 db=session,
                 thread_id="test-node-ctx",
             ):
@@ -520,6 +573,7 @@ async def test_chat_remediation_grounding():
     async def mock_astream(messages):
         class FakeChunk:
             content = "No open findings — no remediation actions needed."
+
         yield FakeChunk()
 
     with patch("app.agents.workflows.chat_workflow.ChatOpenAI") as MockLLM:
@@ -529,6 +583,7 @@ async def test_chat_remediation_grounding():
         events = []
         async with TestSessionLocal() as session:
             from app.agents.workflows.chat_workflow import stream_chat_workflow
+
             async for ev in stream_chat_workflow(
                 "Generate a remediation plan",
                 context=None,
@@ -545,6 +600,7 @@ async def test_chat_remediation_grounding():
 # 8. Follow-up continuity
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_followup_preserves_context():
     """A follow-up question should see previous conversation history."""
@@ -554,7 +610,9 @@ async def test_followup_preserves_context():
 
     clear_thread("test-followup")
     store_message("test-followup", "user", "Analyze the threat landscape")
-    store_message("test-followup", "assistant", "System has 3 nodes, all healthy. No anomalies.")
+    store_message(
+        "test-followup", "assistant", "System has 3 nodes, all healthy. No anomalies."
+    )
 
     history = get_thread_history("test-followup", max_messages=6)
     assert len(history) == 2
@@ -565,6 +623,7 @@ async def test_followup_preserves_context():
 # ═══════════════════════════════════════════════════════════════
 # 9. Topology workflow verification
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_topology_workflow_empty_returns_cleanly():
@@ -585,7 +644,11 @@ async def test_topology_workflow_verifies_before_persist():
     """Topology workflow runs verification before DB writes."""
     await _reset_tables()
 
-    from app.agents.schemas import TopologyAnalysisResult, NodeStatusUpdate, ProposedVulnerability
+    from app.agents.schemas import (
+        TopologyAnalysisResult,
+        NodeStatusUpdate,
+        ProposedVulnerability,
+    )
 
     async with TestSessionLocal() as session:
         await _seed_topology(session)
@@ -594,25 +657,35 @@ async def test_topology_workflow_verifies_before_persist():
     fake_result = TopologyAnalysisResult(
         node_updates=[
             NodeStatusUpdate(
-                node_id="api", new_status="warning",
-                rationale="CPU spike", evidence_refs=["anom-abc"],
+                node_id="api",
+                new_status="warning",
+                rationale="CPU spike",
+                evidence_refs=["anom-abc"],
             ),
             NodeStatusUpdate(
-                node_id="nonexistent", new_status="compromised",
-                rationale="Fake", evidence_refs=["anom-xyz"],
+                node_id="nonexistent",
+                new_status="compromised",
+                rationale="Fake",
+                evidence_refs=["anom-xyz"],
             ),
         ],
         new_vulnerabilities=[
             ProposedVulnerability(
-                title="Ungrounded vuln", severity="high",
-                affected_node_id="api", description="No evidence",
+                title="Ungrounded vuln",
+                severity="high",
+                affected_node_id="api",
+                description="No evidence",
                 evidence_refs=[],
             ),
         ],
     )
 
-    with patch("app.agents.workflows.topology_workflow._analyze_with_llm", return_value=fake_result):
+    with patch(
+        "app.agents.workflows.topology_workflow._analyze_with_llm",
+        return_value=fake_result,
+    ):
         from app.agents.workflows.topology_workflow import run_topology_workflow
+
         async with TestSessionLocal() as session:
             result = await run_topology_workflow(session)
 
@@ -626,6 +699,7 @@ async def test_topology_workflow_verifies_before_persist():
 # 10. Production fallback behavior
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_chat_stream_does_not_mock_in_production():
     """The /llm/chat/stream endpoint does not silently produce mock responses.
@@ -636,10 +710,17 @@ async def test_chat_stream_does_not_mock_in_production():
     await _reset_tables()
 
     async def mock_stream_that_fails(*args, **kwargs):
-        yield {"event": "message", "data": json.dumps({"token": "Error: LLM unavailable"})}
+        yield {
+            "event": "message",
+            "data": json.dumps({"token": "Error: LLM unavailable"}),
+        }
 
-    with patch("app.routers.dashboard.stream_agent_response", new=mock_stream_that_fails):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    with patch(
+        "app.routers.dashboard.stream_agent_response", new=mock_stream_that_fails
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             response = await ac.post("/llm/chat/stream", json={"message": "test"})
 
     assert response.status_code == 200
@@ -652,6 +733,7 @@ async def test_chat_stream_does_not_mock_in_production():
 # 11. Tool failure behavior
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_chat_tool_failure_surfaces_error():
     """When evidence gathering fails, the answer explains what's missing."""
@@ -660,7 +742,10 @@ async def test_chat_tool_failure_surfaces_error():
     async def mock_astream(messages):
         # The LLM should receive the error context and explain the limitation
         class FakeChunk:
-            content = "Evidence gathering failed. Unable to provide a grounded analysis."
+            content = (
+                "Evidence gathering failed. Unable to provide a grounded analysis."
+            )
+
         yield FakeChunk()
 
     with patch("app.agents.workflows.chat_workflow.ChatOpenAI") as MockLLM:
@@ -668,10 +753,14 @@ async def test_chat_tool_failure_surfaces_error():
         instance.astream = mock_astream
 
         # Patch evidence gathering to raise
-        with patch("app.agents.workflows.chat_workflow.get_system_overview", side_effect=Exception("DB error")):
+        with patch(
+            "app.agents.workflows.chat_workflow.get_system_overview",
+            side_effect=Exception("DB error"),
+        ):
             events = []
             async with TestSessionLocal() as session:
                 from app.agents.workflows.chat_workflow import stream_chat_workflow
+
                 async for ev in stream_chat_workflow(
                     "Analyze the current threat landscape",
                     context=None,
@@ -685,9 +774,7 @@ async def test_chat_tool_failure_surfaces_error():
     assert len(data_events) >= 1
 
     # Should include uncertainty note about limited evidence (from verification)
-    all_tokens = "".join(
-        json.loads(e["data"]).get("token", "") for e in data_events
-    )
+    all_tokens = "".join(json.loads(e["data"]).get("token", "") for e in data_events)
     # The mock LLM says "Evidence gathering failed" and verification adds "Limited internal evidence"
     assert "failed" in all_tokens.lower() or "limited" in all_tokens.lower(), (
         f"Expected error/limitation note in output, got: {all_tokens!r}"

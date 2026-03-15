@@ -50,6 +50,7 @@ def clear_thread(thread_id: str) -> None:
 
 # ── Chat answer verification ────────────────────────────────
 
+
 def verify_chat_answer(
     answer_text: str,
     evidence_refs: List[str],
@@ -87,6 +88,7 @@ def verify_chat_answer(
 
 # ── Topology verification ───────────────────────────────────
 
+
 def verify_topology_updates(
     result: TopologyAnalysisResult,
     known_node_ids: set[str],
@@ -105,9 +107,7 @@ def verify_topology_updates(
         # Downgrade compromised if evidence is only telemetry-based
         if u.new_status == "compromised":
             refs = u.evidence_refs
-            has_non_telemetry = any(
-                not r.startswith("anom-") for r in refs
-            )
+            has_non_telemetry = any(not r.startswith("anom-") for r in refs)
             if not has_non_telemetry:
                 logger.info(
                     "Downgrading node %s from compromised to warning (telemetry-only evidence)",
@@ -124,7 +124,9 @@ def verify_topology_updates(
     verified_vulns: List[ProposedVulnerability] = []
     for v in result.new_vulnerabilities:
         if v.affected_node_id not in known_node_ids:
-            logger.warning("Dropping vulnerability for unknown node: %s", v.affected_node_id)
+            logger.warning(
+                "Dropping vulnerability for unknown node: %s", v.affected_node_id
+            )
             continue
         if not v.evidence_refs:
             logger.warning("Dropping vulnerability without evidence refs: %s", v.title)
@@ -149,25 +151,53 @@ def verify_topology_updates(
 
 INTENT_KEYWORDS = {
     "system_threat_landscape": [
-        "threat landscape", "system status", "overview", "security posture",
-        "what's happening", "current threats", "system health",
+        "threat landscape",
+        "system status",
+        "overview",
+        "security posture",
+        "what's happening",
+        "current threats",
+        "system health",
     ],
     "node_investigation": [
-        "investigate", "node", "service", "container", "what about",
-        "tell me about", "status of", "check on",
+        "investigate",
+        "node",
+        "service",
+        "container",
+        "what about",
+        "tell me about",
+        "status of",
+        "check on",
     ],
     "remediation_plan": [
-        "remediation", "remediate", "fix", "mitigate", "action plan",
-        "what should we do", "how to fix", "containment",
+        "remediation",
+        "remediate",
+        "fix",
+        "mitigate",
+        "action plan",
+        "what should we do",
+        "how to fix",
+        "containment",
     ],
     "rbac_risk": [
-        "rbac", "role", "permission", "access control", "privilege",
+        "rbac",
+        "role",
+        "permission",
+        "access control",
+        "privilege",
     ],
     "vulnerability_summary": [
-        "vulnerability", "vulnerabilities", "cve", "exploit",
+        "vulnerability",
+        "vulnerabilities",
+        "cve",
+        "exploit",
     ],
     "explain_finding": [
-        "explain", "what does this mean", "finding", "insight", "why",
+        "explain",
+        "what does this mean",
+        "finding",
+        "insight",
+        "why",
     ],
 }
 

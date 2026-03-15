@@ -11,6 +11,7 @@ from h4ckath0n.realtime import sse_response, authenticate_sse_request, AuthError
 
 router = APIRouter(tags=["dashboard"])
 
+
 class UploadItem(BaseModel):
     id: str
     original_filename: str
@@ -18,6 +19,7 @@ class UploadItem(BaseModel):
     byte_size: int
     extraction_job_id: Optional[str]
     created_at: str
+
 
 class JobItem(BaseModel):
     id: str
@@ -27,20 +29,26 @@ class JobItem(BaseModel):
     error: Optional[str]
     created_at: str
 
+
 @router.get("/uploads", response_model=List[UploadItem])
 def get_uploads(user: Any = Depends(require_user)) -> List[UploadItem]:
     # Mock uploads list for dashboard
     return []
 
+
 @router.post("/uploads", response_model=dict)
-def create_upload(file: UploadFile = File(...), user: Any = Depends(require_user)) -> dict:
+def create_upload(
+    file: UploadFile = File(...), user: Any = Depends(require_user)
+) -> dict:
     # Accept file upload
     return {"status": "ok", "filename": file.filename}
+
 
 @router.get("/jobs", response_model=List[JobItem])
 def get_jobs(user: Any = Depends(require_user)) -> List[JobItem]:
     # Mock jobs list for dashboard
     return []
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -54,10 +62,14 @@ from app.core.database import get_db_session
 from app.agents.chat import stream_agent_response
 
 import logging
+
 logger = logging.getLogger(__name__)
 
+
 @router.post("/llm/chat/stream")
-async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_session)) -> Any:
+async def chat_stream(
+    request: Request, db: AsyncSession = Depends(get_db_session)
+) -> Any:
     """Stream an AI security analysis response via SSE.
 
     Accepts JSON body:
@@ -89,7 +101,9 @@ async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_sessio
     async def generate_response():
         try:
             async for sse_dict in stream_agent_response(
-                user_msg, context, db,
+                user_msg,
+                context,
+                db,
                 thread_id=thread_id,
                 history=history,
             ):
@@ -100,7 +114,9 @@ async def chat_stream(request: Request, db: AsyncSession = Depends(get_db_sessio
             logger.error(f"SSE stream failed: {e}")
             yield {
                 "event": "message",
-                "data": json.dumps({"token": "\\n\\n**Connection Error:** Stream interrupted."})
+                "data": json.dumps(
+                    {"token": "\\n\\n**Connection Error:** Stream interrupted."}
+                ),
             }
 
     return sse_response(generate_response())
